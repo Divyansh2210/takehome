@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Annotation TPM Take-home</title>
+<style>
+  :root {
+    --bg: #F4F4F1;
+    --surface: #FFFFFF;
+    --surface-2: #EDEDE8;
+    --ink: #1B1E24;
+    --muted: #59616E;
+    --faint: #8B919C;
+    --hairline: #DEDED8;
+    --hairline-2: #CFCFC8;
+    --accent: #33518F;
+    --accent-soft: #E8ECF5;
+    --pass: #257A4E;
+    --pass-soft: #E3F0E8;
+    --fail: #B23A34;
+    --fail-soft: #F6E7E5;
+    --warn: #9A6B1F;
+    --warn-soft: #F5EDDC;
+    --code-bg: #EFEFEA;
+    --shadow: 0 1px 3px rgba(27,30,36,.07), 0 8px 24px rgba(27,30,36,.05);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161A;
+      --surface: #1C1F25;
+      --surface-2: #23262D;
+      --ink: #E6E4DF;
+      --muted: #A0A6B0;
+      --faint: #767D89;
+      --hairline: #2C3038;
+      --hairline-2: #3A3F49;
+      --accent: #8AA4DC;
+      --accent-soft: #232B3D;
+      --pass: #62BA8E;
+      --pass-soft: #1D2F26;
+      --fail: #E28A82;
+      --fail-soft: #382220;
+      --warn: #D3A559;
+      --warn-soft: #33290F;
+      --code-bg: #22252C;
+      --shadow: 0 1px 3px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.25);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161A;
+    --surface: #1C1F25;
+    --surface-2: #23262D;
+    --ink: #E6E4DF;
+    --muted: #A0A6B0;
+    --faint: #767D89;
+    --hairline: #2C3038;
+    --hairline-2: #3A3F49;
+    --accent: #8AA4DC;
+    --accent-soft: #232B3D;
+    --pass: #62BA8E;
+    --pass-soft: #1D2F26;
+    --fail: #E28A82;
+    --fail-soft: #382220;
+    --warn: #D3A559;
+    --warn-soft: #33290F;
+    --code-bg: #22252C;
+    --shadow: 0 1px 3px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Charter, 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  code, .mono, kbd {
+    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+
+  /* ---------- progress bar ---------- */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 2px; width: 0;
+    background: var(--accent); z-index: 60;
+  }
+
+  /* ---------- layout: two independent panes ---------- */
+  .frame { display: flex; height: 100vh; overflow: hidden; }
+
+  aside#brief {
+    width: clamp(360px, 34vw, 500px); flex-shrink: 0;
+    height: 100%; overflow-y: auto;
+    border-right: 1px solid var(--hairline);
+    padding: 22px 18px 48px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    scrollbar-width: thin;
+    background: var(--bg);
+  }
+  #brief .pane-note { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 2px 12px; }
+
+  /* ---------- the assignment document, rendered as the received PDF ---------- */
+  /* deliberately fixed light "paper" in both themes: it is a document, not UI */
+  .paper {
+    background: #FFFFFF; color: #202124;
+    border: 1px solid var(--hairline-2); border-radius: 3px;
+    box-shadow: var(--shadow);
+    padding: 26px 22px 30px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12.5px; line-height: 1.5;
+  }
+  .paper .doc-title { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; margin: 4px 0 20px; color: #000; }
+  .paper h3.doc-h2 { font-size: 16.5px; font-weight: 400; color: #000; margin: 24px 0 10px; font-family: inherit; letter-spacing: 0; }
+  .paper .doc-list { list-style: none; padding-left: 4px; margin: 0 0 10px; }
+  .paper .doc-list li { margin: 0 0 5px; padding-left: 17px; position: relative; }
+  .paper .doc-list li::before { content: '●'; position: absolute; left: 0; font-size: 8px; top: 4px; color: #202124; }
+  .paper .doc-list li.o::before { content: '○'; font-size: 9px; top: 3px; }
+  .paper .doc-list li.o { margin-left: 20px; }
+  .paper .doc-list li.plain { padding-left: 0; }
+  .paper .doc-list li.plain::before { content: none; }
+  .paper .toc .toc-a { color: #1155CC; text-decoration: underline; cursor: pointer; display: block; margin-bottom: 4px; font-size: 12.5px; background: none; border: none; padding: 0; font-family: inherit; text-align: left; }
+  .paper .toc .toc-a:hover { background: #E8F0FE; }
+  .paper u { text-decoration: underline; }
+
+  /* the gray task boxes from the PDF */
+  .taskbox {
+    border: 2px solid #1a1a1a; background: #F1F1F1;
+    padding: 10px 12px; margin: 10px 0 16px;
+  }
+  .taskbox ol.abc { list-style: none; padding-left: 22px; margin: 3px 0 5px; counter-reset: abc; }
+  .taskbox ol.abc li { counter-increment: abc; padding-left: 17px; position: relative; margin-bottom: 3px; }
+  .taskbox ol.abc li::before { content: counter(abc, lower-alpha) '.'; position: absolute; left: 0; }
+  .taskbox ol.nums { list-style: none; padding-left: 4px; margin: 0; counter-reset: nums; }
+  .taskbox ol.nums > li { counter-increment: nums; padding-left: 19px; position: relative; margin-bottom: 5px; }
+  .taskbox ol.nums > li::before { content: counter(nums) '.'; position: absolute; left: 2px; }
+
+  /* clickable question lines & inline spans inside the document */
+  .b-q {
+    display: inline; cursor: pointer;
+    background: transparent; border: none; padding: 0; margin: 0;
+    font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; text-align: left;
+    border-radius: 2px;
+    box-decoration-break: clone; -webkit-box-decoration-break: clone;
+    transition: background .12s ease;
+  }
+  .b-q:hover { background: #D8E4FB; box-shadow: 0 0 0 3px #D8E4FB; }
+  .b-q.active { background: #E4EDFD; box-shadow: 0 0 0 3px #E4EDFD; }
+  .b-q .arrow { display: none; }
+
+  /* clickable topic headings inside the document */
+  .b-topic-head {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: none; border: none; padding: 0; border-radius: 2px;
+    font-family: inherit; font-size: 16.5px; font-weight: 400; color: #000;
+    margin: 26px 0 10px;
+  }
+  .b-topic-head:hover { background: #D8E4FB; box-shadow: 0 0 0 3px #D8E4FB; }
+
+  /* mini reference boxes mirroring the PDF's material boxes */
+  .doc-box {
+    display: block; width: 100%; text-align: left; box-sizing: border-box;
+    border: 1px solid #444; background: #fff; padding: 6px 10px; margin: 8px 0 0;
+    font-family: inherit; font-size: 12px; color: #202124;
+  }
+  .doc-box .bx-t { font-weight: 700; display: block; }
+  .doc-box .bx-t.und { text-decoration: underline; }
+  .doc-box .bx-s { color: #5f6368; font-size: 11px; display: block; margin-top: 1px; }
+  .doc-box.gray { background: #F1F1F1; }
+  .doc-box .mono-line { display: block; margin-top: 2px; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 10.5px; color: #333; }
+
+  /* topic 3 context block (blue-gray, like the PDF) */
+  .ctxbox { background: #DCE7EA; padding: 10px 12px; margin: 10px 0 16px; }
+  .ctxbox .ctx-label { font-weight: 700; }
+  .ctxbox table.req {
+    border-collapse: collapse; background: #fff; width: 100%; margin-top: 8px;
+    font-family: inherit; font-size: 11.5px;
+  }
+  .ctxbox table.req th, .ctxbox table.req td {
+    border: 1px solid #1a1a1a; padding: 5px 7px; vertical-align: top; text-align: left;
+    color: #202124; background: #fff; font-size: 11.5px; line-height: 1.45; white-space: normal;
+  }
+  .ctxbox table.req th { font-weight: 700; text-transform: none; letter-spacing: 0; }
+  .ctxbox .req ul { margin: 4px 0 0; padding-left: 16px; }
+  .ctxbox .req ul li { margin-bottom: 3px; }
+  .ctxbox .glink { color: #1155CC; text-decoration: underline; }
+
+  /* beyond-the-brief strip, outside the paper */
+  .beyond { margin-top: 16px; }
+  .beyond .beyond-label {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint);
+    margin-bottom: 6px;
+  }
+  .beyond .b-q {
+    display: block; width: 100%; border: 1px dashed var(--hairline-2); border-radius: 4px;
+    background: transparent; color: var(--muted); padding: 7px 10px; margin: 5px 0;
+    font-size: 12px; line-height: 1.45; box-shadow: none;
+  }
+  .beyond .b-q:hover { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); box-shadow: none; }
+  .beyond .b-q.active { background: var(--accent-soft); color: var(--ink); box-shadow: none; border-color: var(--accent); }
+
+  #brief .brief-tools { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 6px; }
+  #brief .brief-tools button {
+    text-align: left; background: none; border: 1px solid var(--hairline); border-radius: 3px;
+    color: var(--muted); font-size: 12px; padding: 6px 9px; cursor: pointer; font-family: inherit;
+  }
+  #brief .brief-tools button:hover { color: var(--ink); border-color: var(--hairline-2); }
+  #brief kbd {
+    font-size: 10.5px; border: 1px solid var(--hairline-2); border-bottom-width: 2px;
+    border-radius: 3px; padding: 0 4px; margin-left: 4px; color: var(--faint);
+  }
+
+  main { flex: 1; min-width: 0; height: 100%; overflow-y: auto; scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { main { scroll-behavior: auto; } }
+  .col { max-width: 47rem; margin: 0 auto; padding: 0 44px 120px; }
+
+  /* flash highlight when jumped to */
+  @keyframes flashbg { 0% { background: var(--accent-soft); } 100% { background: transparent; } }
+  .flash { animation: flashbg 1.6s ease-out 1; border-radius: 4px; }
+
+  /* ---------- masthead ---------- */
+  header.masthead { padding-top: 64px; margin-bottom: 8px; }
+  .eyebrow {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+    margin-bottom: 14px;
+  }
+  h1.doc-title {
+    font-size: clamp(30px, 4.4vw, 44px); line-height: 1.12; font-weight: 700;
+    letter-spacing: -0.015em; text-wrap: balance; margin-bottom: 14px;
+  }
+  .byline { font-size: 15px; color: var(--muted); margin-bottom: 6px; }
+  .byline strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- how to read ---------- */
+  .howto {
+    margin: 34px 0 10px; border: 1px solid var(--hairline); background: var(--surface);
+    border-radius: 4px; overflow: hidden;
+  }
+  .howto .howto-head {
+    padding: 12px 18px; border-bottom: 1px solid var(--hairline);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint);
+  }
+  .howto-rows { display: grid; }
+  .howto-row { display: grid; grid-template-columns: 92px 1fr; gap: 14px; padding: 13px 18px; border-bottom: 1px solid var(--hairline); }
+  .howto-row:last-child { border-bottom: none; }
+  .howto-row .t { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12.5px; color: var(--accent); font-weight: 600; padding-top: 2px; }
+  .howto-row .d { font-size: 14.5px; color: var(--muted); line-height: 1.5; }
+  .howto-row .d strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- topic index cards ---------- */
+  .topic-index { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 26px 0 0; }
+  .topic-index a {
+    display: block; border: 1px solid var(--hairline); background: var(--surface); border-radius: 4px;
+    padding: 14px 16px; text-decoration: none; color: var(--ink);
+  }
+  .topic-index a:hover { border-color: var(--accent); }
+  .topic-index .n { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; color: var(--faint); letter-spacing: .1em; }
+  .topic-index .t { font-weight: 600; font-size: 15.5px; margin: 3px 0 2px; }
+  .topic-index .m { font-size: 12.5px; color: var(--muted); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+  /* ---------- sections ---------- */
+  section.topic { padding-top: 30px; }
+  .topic-rule { border: none; border-top: 1px solid var(--hairline-2); margin: 64px 0 0; }
+  .topic-head { padding-top: 42px; margin-bottom: 26px; }
+  .topic-head .eyebrow { margin-bottom: 10px; }
+  h2.topic-title { font-size: 30px; line-height: 1.18; font-weight: 700; letter-spacing: -0.012em; text-wrap: balance; }
+  .topic-head .brief { margin-top: 12px; font-size: 15px; color: var(--muted); font-style: italic; }
+
+  h3 { font-size: 21px; font-weight: 700; letter-spacing: -0.008em; margin: 44px 0 14px; text-wrap: balance; }
+  h4 { font-size: 17px; font-weight: 700; margin: 30px 0 10px; }
+  h5 { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--faint); font-weight: 600; margin: 26px 0 10px; }
+  p { margin: 0 0 14px; }
+  p.lead { font-size: 18px; }
+  a { color: var(--accent); }
+  strong { font-weight: 700; }
+  ul, ol { margin: 0 0 16px; padding-left: 24px; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--faint); }
+
+  /* ---------- decision card ---------- */
+  .decision {
+    border: 1px solid var(--hairline-2); background: var(--surface); border-radius: 4px;
+    margin: 22px 0 30px; box-shadow: var(--shadow);
+  }
+  .decision .tag {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 10px 18px; border-bottom: 1px solid var(--hairline);
+  }
+  .decision .tag .l {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: var(--accent); font-weight: 600;
+  }
+  .decision .tag .r { font-size: 12px; color: var(--faint); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .decision .body { padding: 16px 18px 6px; }
+  .decision .call { font-size: 17px; font-weight: 600; line-height: 1.45; margin-bottom: 8px; }
+  .decision .why { font-size: 14.5px; color: var(--muted); margin-bottom: 12px; }
+  .decision-grid { display: grid; grid-template-columns: 150px 1fr; border-top: 1px solid var(--hairline); }
+  .decision-grid > div { padding: 10px 18px 10px 0; border-bottom: 1px solid var(--hairline); font-size: 14px; }
+  .decision-grid > div:nth-child(odd) {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12.5px; font-weight: 600; color: var(--muted); padding-left: 18px; padding-top: 12px;
+  }
+  .decision-grid > div:nth-last-child(-n+2) { border-bottom: none; }
+
+  /* ---------- tables ---------- */
+  .tablewrap { overflow-x: auto; margin: 18px 0 24px; border: 1px solid var(--hairline); border-radius: 4px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  th {
+    text-align: left; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--faint); font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--hairline-2);
+    background: var(--surface-2); white-space: nowrap;
+  }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--hairline); vertical-align: top; line-height: 1.5; }
+  tr:last-child td { border-bottom: none; }
+  td.key { font-weight: 600; white-space: nowrap; }
+  td .sub { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .num { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 13px; }
+
+  /* ---------- verdict chips ---------- */
+  .chip {
+    display: inline-block; min-width: 26px; text-align: center;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; font-weight: 700;
+    border-radius: 3px; padding: 2px 7px;
+  }
+  .chip.y { color: var(--pass); background: var(--pass-soft); }
+  .chip.n { color: var(--fail); background: var(--fail-soft); }
+  .chip.na { color: var(--faint); background: var(--surface-2); }
+  .verdict-pill {
+    display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .04em; border-radius: 3px; padding: 3px 9px;
+  }
+  .verdict-pill.major { color: var(--warn); background: var(--warn-soft); }
+  .verdict-pill.critical { color: var(--fail); background: var(--fail-soft); }
+  .verdict-pill.pass { color: var(--pass); background: var(--pass-soft); }
+
+  /* ---------- stat tiles ---------- */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 22px 0 8px; }
+  .stat { border: 1px solid var(--hairline); background: var(--surface); border-radius: 4px; padding: 14px 15px 12px; }
+  .stat .v { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 21px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .stat .v small { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .stat .k { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+  .stat.flag .v { color: var(--fail); }
+  .stat.ok .v { color: var(--pass); }
+
+  /* ---------- collapsibles ---------- */
+  details.fold { border: 1px solid var(--hairline); border-radius: 4px; background: var(--surface); margin: 16px 0 20px; }
+  details.fold > summary {
+    cursor: pointer; list-style: none; padding: 12px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13.5px; font-weight: 600; color: var(--muted);
+    display: flex; align-items: center; gap: 10px; user-select: none;
+  }
+  details.fold > summary:hover { color: var(--ink); }
+  details.fold > summary::-webkit-details-marker { display: none; }
+  details.fold > summary::before {
+    content: '+'; font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    color: var(--accent); font-weight: 400; font-size: 15px; width: 14px; flex-shrink: 0;
+  }
+  details.fold[open] > summary::before { content: '−'; }
+  details.fold > summary .note { font-weight: 400; color: var(--faint); font-size: 12px; margin-left: auto; padding-left: 12px; text-align: right; }
+  details.fold > .fold-body { padding: 4px 18px 16px; border-top: 1px solid var(--hairline); }
+  details.fold > .fold-body > :first-child { margin-top: 14px; }
+
+  /* ---------- callouts / asides ---------- */
+  .aside {
+    border: 1px solid var(--hairline); border-left: 3px solid var(--accent);
+    background: var(--surface); border-radius: 0 4px 4px 0; padding: 14px 18px; margin: 18px 0 22px;
+    font-size: 15px;
+  }
+  .aside .aside-label {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
+    display: block; margin-bottom: 6px; font-weight: 600;
+  }
+  .aside p:last-child { margin-bottom: 0; }
+
+  /* ---------- attachments ---------- */
+  .attachments { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 18px 0 24px; }
+  .attachment {
+    display: block; border: 1px solid var(--hairline); border-radius: 4px; background: var(--surface);
+    padding: 13px 16px; text-decoration: none;
+  }
+  .attachment:hover { border-color: var(--accent); }
+  .attachment .ft { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: .12em; color: var(--faint); text-transform: uppercase; }
+  .attachment .fn { color: var(--ink); font-weight: 600; font-size: 14.5px; margin: 3px 0 2px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .attachment .fd { color: var(--muted); font-size: 12.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+  /* ---------- flow / tree diagrams ---------- */
+  .flow { margin: 20px 0 26px; }
+  .flow-step { display: grid; grid-template-columns: 34px 1fr; gap: 0 14px; }
+  .flow-step .dot-col { display: flex; flex-direction: column; align-items: center; }
+  .flow-step .dot {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid var(--hairline-2); background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px; font-weight: 600; color: var(--accent);
+  }
+  .flow-step .line { width: 1px; flex: 1; background: var(--hairline-2); min-height: 14px; }
+  .flow-step:last-child .line { display: none; }
+  .flow-step .fc { padding-bottom: 18px; }
+  .flow-step .ft { font-weight: 600; font-size: 15.5px; padding-top: 2px; }
+  .flow-step .ft .gate {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; letter-spacing: .1em;
+    color: var(--warn); background: var(--warn-soft); border-radius: 3px; padding: 2px 7px; margin-left: 8px;
+    text-transform: uppercase; vertical-align: 2px;
+  }
+  .flow-step .fd { color: var(--muted); font-size: 14px; margin-top: 3px; line-height: 1.5; }
+
+  .tree { border: 1px solid var(--hairline); border-radius: 4px; background: var(--surface); padding: 20px 18px 8px; margin: 18px 0 24px; overflow-x: auto; }
+  .tree .tree-root {
+    text-align: center; font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); font-weight: 700; margin-bottom: 16px;
+  }
+  .tree-branches { display: grid; gap: 12px; }
+  .tree-branch { border-top: 2px solid var(--accent); padding-top: 10px; }
+  .tree-branch .bt { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+  .tree-leaves { display: grid; gap: 8px; }
+  .leaf { border: 1px solid var(--hairline); border-radius: 3px; padding: 8px 11px; background: var(--bg); }
+  .leaf .lt { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+  .leaf .ld { font-size: 12.5px; color: var(--muted); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.45; }
+  .leaf.pos { border-left: 3px solid var(--pass); }
+  .leaf.pos .lt { color: var(--pass); }
+  .leaf.neg { border-left: 3px solid var(--fail); }
+  .leaf.neg .lt { color: var(--fail); }
+  .tree-branch .suits { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 8px; font-family: Charter, Georgia, serif; line-height: 1.45; }
+
+  /* ---------- connected flowchart (root → branches → leaves) ---------- */
+  .fchart { display: flex; flex-direction: column; align-items: center; min-width: 640px; padding: 4px 2px 8px; }
+  .fc-node {
+    border: 1px solid var(--hairline-2); background: var(--bg); border-radius: 3px;
+    padding: 7px 14px; text-align: center;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--ink);
+  }
+  .fc-node.root { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .fc-vline { width: 1px; height: 16px; background: var(--hairline-2); }
+  .fc-kids { display: flex; align-items: stretch; width: 100%; }
+  .fc-kid { flex: 1; position: relative; padding-top: 16px; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .fc-kid::before { content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 16px; background: var(--hairline-2); }
+  .fc-kid::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--hairline-2); }
+  .fc-kid:first-child::after { left: 50%; }
+  .fc-kid:last-child::after { right: 50%; }
+  .fc-kid:only-child::after { display: none; }
+  .fc-cap {
+    margin-top: 0; border: 1px solid var(--hairline); border-radius: 3px; background: var(--surface);
+    padding: 8px 10px; font-size: 12px; color: var(--muted); line-height: 1.45; text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    width: calc(100% - 14px); box-sizing: border-box;
+  }
+  .fc-cap .cap-id { display: block; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; letter-spacing: .1em; color: var(--accent); font-weight: 600; margin-bottom: 2px; text-transform: uppercase; }
+
+  /* ---------- sample cards (topic 2) ---------- */
+  .sample-card { border: 1px solid var(--hairline); border-radius: 4px; background: var(--surface); margin: 16px 0 20px; overflow: hidden; }
+  .sample-card .sc-head { padding: 11px 16px; border-bottom: 1px solid var(--hairline); display: flex; align-items: baseline; gap: 10px; }
+  .sample-card .sc-head .id { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .sample-card .sc-head .t { font-weight: 600; font-size: 14.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .sample-card .sc-body { padding: 14px 16px 6px; }
+  .sample-card .sc-body p { font-size: 14.5px; }
+  .prompt-quote {
+    font-style: italic; color: var(--muted); border-left: 2px solid var(--hairline-2);
+    padding: 2px 0 2px 14px; margin: 10px 0 14px; font-size: 14.5px;
+  }
+
+  /* ---------- code ---------- */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--hairline); border-radius: 4px;
+    padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 12px 0 18px;
+  }
+  code { font-size: .88em; background: var(--code-bg); border-radius: 3px; padding: 1px 5px; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  /* ---------- quick jump palette ---------- */
+  #jump-overlay {
+    position: fixed; inset: 0; background: rgba(15,17,21,.45); z-index: 100;
+    display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh;
+  }
+  #jump {
+    width: min(560px, 92vw); background: var(--surface); border: 1px solid var(--hairline-2);
+    border-radius: 6px; box-shadow: 0 20px 60px rgba(0,0,0,.3); overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  #jump input {
+    width: 100%; border: none; outline: none; background: transparent; color: var(--ink);
+    font-size: 15px; padding: 14px 16px; border-bottom: 1px solid var(--hairline); font-family: inherit;
+  }
+  #jump-list { max-height: 46vh; overflow-y: auto; padding: 6px; }
+  #jump-list .jitem { padding: 8px 11px; border-radius: 4px; cursor: pointer; display: flex; gap: 10px; align-items: baseline; }
+  #jump-list .jitem .jt { font-size: 13.5px; color: var(--ink); }
+  #jump-list .jitem .jc { font-size: 11px; color: var(--faint); margin-left: auto; white-space: nowrap; }
+  #jump-list .jitem.sel { background: var(--accent-soft); }
+  #jump-list .jitem.sel .jt { color: var(--accent); font-weight: 600; }
+  #jump .jump-hint { padding: 8px 14px; border-top: 1px solid var(--hairline); font-size: 11px; color: var(--faint); display: flex; gap: 14px; }
+
+  /* ---------- footer ---------- */
+  footer.docfoot { margin-top: 80px; padding-top: 22px; border-top: 1px solid var(--hairline-2); font-size: 13px; color: var(--faint); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+  /* ---------- responsive ---------- */
+  #railtoggle { display: none; }
+  @media (max-width: 960px) {
+    aside#brief {
+      position: fixed; left: 0; top: 0; z-index: 80; background: var(--bg);
+      transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow);
+      width: min(370px, 88vw); height: 100vh;
+    }
+    aside#brief.open { transform: translateX(0); }
+    #railtoggle {
+      display: flex; position: fixed; top: 14px; left: 14px; z-index: 90;
+      background: var(--surface); border: 1px solid var(--hairline-2); border-radius: 4px;
+      padding: 7px 11px; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; align-items: center; gap: 6px;
+    }
+    .col { padding: 0 22px 90px; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .attachments { grid-template-columns: 1fr; }
+    .decision-grid { grid-template-columns: 120px 1fr; }
+    header.masthead { padding-top: 76px; }
+  }
+
+  /* ---------- print ---------- */
+  @media print {
+    .frame { display: block; height: auto; overflow: visible; }
+    main { height: auto; overflow: visible; }
+    aside#brief, #railtoggle, #progress, #jump-overlay { display: none !important; }
+    body { background: #fff; color: #111; font-size: 11pt; }
+    .col { max-width: none; padding: 0; }
+    details.fold { border: none; }
+    details.fold > summary { display: none; }
+    details.fold > .fold-body { padding: 0; border: none; }
+    .decision, .stat, .tablewrap, .sample-card, .tree, .aside, .howto { box-shadow: none; break-inside: avoid; }
+    a { color: #111; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<button id="railtoggle" aria-label="Open the assignment pane">☰ Assignment</button>
+
+<div class="frame">
+<aside id="brief" aria-label="The assignment">
+  <p class="pane-note">The assignment as received, in full. Click any question, box or topic to jump to the part of the submission that answers it.</p>
+
+  <div class="paper">
+    <div class="doc-title">Take home for Data Annotation TPM</div>
+
+    <h3 class="doc-h2">Introduction</h3>
+    <ul class="doc-list">
+      <li><strong>Purpose of the session :</strong></li>
+      <li class="o">Help us go deeper into your experience and ways of thinking</li>
+      <li class="o">Push you to think deeply about the role to help you decide if it’s the right fit for you</li>
+      <li><strong>Preparation time :</strong> preparing the session requires a few hours of reflection and content production</li>
+      <li><strong>Presentation format and time:</strong></li>
+      <li class="o">The interview will be scheduled for 1-hour.</li>
+      <li class="o">Please use the format that feels most effective to support a productive discussion</li>
+      <li class="o">The length of your presentation is left to your good judgment - we do not necessarily correlate presentation length and depth / relevance of thinking.</li>
+      <li><strong>Timeline :</strong> please share the document <u>24h before</u> the scheduled interview; this will allow us to get prepared and make the session even more productive</li>
+    </ul>
+
+    <h3 class="doc-h2">Topics of discussion</h3>
+    <div class="toc">
+      <button class="toc-a" data-target="t1">Topic 1 : Rating</button>
+      <button class="toc-a" data-target="t2">Topic 2 : Reviewing third-party samples</button>
+      <button class="toc-a" data-target="t3">Topic 3: Annotation campaign</button>
+      <button class="toc-a" data-target="t4">Topic 4: Sourcing</button>
+      <button class="toc-a" data-target="t5">Topic 5: Management</button>
+    </div>
+
+    <button class="b-topic-head" data-target="t1">Topic 1 : Rating</button>
+    <div class="taskbox">
+      <ol class="nums">
+        <li>For the sample below,
+          <ol class="abc">
+            <li><button class="b-q" data-target="t1">Select a preference rating</button></li>
+            <li><button class="b-q" data-target="t1-reasoning">Explain your thought process and why you selected that rating</button></li>
+            <li><button class="b-q" data-target="t1-rewrite">If you are able to improve the preferred response, please suggest edits and explain what you re-wrote.</button></li>
+          </ol>
+        </li>
+        <li><button class="b-q" data-target="t1-errors">What type of errors could annotators make ? What steps would you take to prevent or address those types of errors ?</button></li>
+      </ol>
+    </div>
+    <div class="doc-box"><span class="bx-t">User prompt</span><span class="mono-line">does hot lemon water have health benefits in french</span><span class="bx-s">Model A - response · Model B - response → the provided sample, as received</span></div>
+    <div class="doc-box"><span class="bx-t">Preference rating</span><span class="mono-line">[*] A is much better&nbsp;&nbsp;[ ] A is better&nbsp;&nbsp;[ ] A is slightly better&nbsp;&nbsp;[ ] Tie&nbsp;&nbsp;[ ] B is slightly better&nbsp;&nbsp;[ ] B is better&nbsp;&nbsp;[ ] B is much better</span></div>
+    <div class="doc-box"><span class="bx-t">Explanation of preference rating</span></div>
+    <div class="doc-box"><span class="bx-t">Rewrite <span style="font-weight:400">(optional)</span></span></div>
+
+    <button class="b-topic-head" data-target="t2">Topic 2 : Reviewing third-party samples</button>
+    <div class="taskbox">
+      Review the following guidelines and annotations.
+      <ul class="doc-list" style="margin-top:5px; margin-bottom:0;">
+        <li><button class="b-q" data-target="t2-framework">How would you go about evaluating the annotation quality?</button> <button class="b-q" data-target="t2-efficiency">What steps would you take to make the quality review as efficient as possible?</button></li>
+        <li><button class="b-q" data-target="t2-verdicts">Please share a summary of the annotation quality.</button> <button class="b-q" data-target="t2-actions">What actions would you recommend to address the quality issues you identified?</button></li>
+        <li><button class="b-q" data-target="t2-good">Generate 2 more samples that annotators could use as a reference of what “good quality” looks like.</button></li>
+      </ul>
+    </div>
+    <div class="doc-box gray"><span class="bx-t und">GUIDELINES <em>(provided to annotators)</em></span><span class="bx-s">Objective · Context · For each sample</span></div>
+    <div class="doc-box gray"><span class="bx-t und">FUNCTIONS</span><span class="mono-line">get_recipe · check_pantry · scale_recipe · estimate_prep_time · suggest_substitute</span></div>
+    <div class="doc-box gray"><span class="bx-t und">SAMPLES</span><span class="bx-s">SAMPLE #1 · SAMPLE #2 · SAMPLE #3 → reviewed against the framework</span></div>
+
+    <button class="b-topic-head" data-target="t3">Topic 3: Annotation campaign</button>
+    <div class="ctxbox">
+      <span class="ctx-label">Context :</span><br>
+      You just received the following campaign request.
+      <table class="req">
+        <tr><th>Task ID</th><th>Desired due date</th><th>Prio rity</th><th>Volume</th><th>Task description</th></tr>
+        <tr>
+          <td>01_gdp val_fina nce</td>
+          <td>In 2-3 weeks</td>
+          <td>P0</td>
+          <td>1,000 samples</td>
+          <td>Create 1,000 samples structured similarly to <span class="glink">GDPVal</span> samples. Here we want to focus on any subdomain of finance.
+            We want to make sure that the samples cover:
+            <ul>
+              <li>Realistic and diverse enterprise use cases (everyday use cases experts in the domain currently do or could ask a model to help them do).</li>
+              <li>Require complex tool interactions.</li>
+              <li>Require some reasoning from the model (calculations, interpreting data, extracting relevant data).</li>
+              <li>Require inputs and/or output file(s).</li>
+            </ul>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div class="taskbox">
+      <strong>Task</strong>
+      <ul class="doc-list" style="margin-top:5px; margin-bottom:0;">
+        <li><button class="b-q" data-target="t3">How would you translate this request into a fully defined annotation campaign?</button></li>
+        <li class="o"><button class="b-q" data-target="t3-s11">How would you go about building guidelines for a domain that you may not be an expert in?</button></li>
+        <li class="o"><button class="b-q" data-target="t3-s4">Share a rough draft of the annotation guidelines for the above campaign.</button></li>
+        <li class="o"><button class="b-q" data-target="t3-s52">What other elements would you need to build or put in place?</button></li>
+        <li><button class="b-q" data-target="t3-s7">How would you decide whether to build the samples in-house or buy from external vendors?</button></li>
+        <li><button class="b-q" data-target="t3-s8">In what ways could a provider (whether internal or external) underdeliver? How would you approach such a risk?</button></li>
+      </ul>
+    </div>
+
+    <button class="b-topic-head" data-target="t4">Topic 4: Sourcing</button>
+    <p style="margin:0 0 10px;"><strong>Context :</strong><br>We’re not certain if we have the suite of providers that best suits our annotation needs for the campaign discussed in Topic 3, and we’d like to explore other options.</p>
+    <div class="taskbox">
+      <strong>Task</strong>
+      <ul class="doc-list" style="margin-top:5px; margin-bottom:0;">
+        <li><button class="b-q" data-target="t4-s1">How might you discover and solicit information from other providers?</button></li>
+        <li><button class="b-q" data-target="t4-s2">Assuming that we proceed with requesting bids from potential providers, what would be the process to evaluate bids? What would be the main points of consideration?</button></li>
+        <li><button class="b-q" data-target="t4-s4">What elements would be crucial to bake into a contract?</button> <button class="b-q" data-target="t4-s3">How would you evaluate and negotiate rates proposed by a provider?</button></li>
+      </ul>
+    </div>
+
+    <button class="b-topic-head" data-target="t5">Topic 5: Management</button>
+    <div class="taskbox">
+      <strong>Task</strong><br>
+      If you were to build an annotator pool to build the above GDPVal dataset, what process would you put in place to:
+      <ul class="doc-list" style="margin-top:5px; margin-bottom:0;">
+        <li><button class="b-q" data-target="t5-s1">recruit domain-specific expert annotators (e.g. Physics, Maths, Biology, Finance, sub-domains of industry, etc.)?</button> <button class="b-q" data-target="t5-s2">What skillset would you seek?</button> <button class="b-q" data-target="t5-s3">How would you evaluate candidate potential?</button></li>
+        <li><button class="b-q" data-target="t5-s4">guarantee quality?</button></li>
+        <li><button class="b-q" data-target="t5-s5">track several teams of expert annotators across different sub-domains (tasks they need to work on a weekly basis, keeping track of contract end dates and extensions, etc.)?</button></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="beyond">
+    <div class="beyond-label">Answered beyond the brief</div>
+    <button class="b-q" data-target="t1-ambiguity">Non-annotation notes: ideal response classification for the ambiguous Topic 1 prompt</button>
+    <button class="b-q" data-target="t3-s22">Evaluation architecture: verifiers vs pairwise grading, and what stays RL-usable</button>
+    <button class="b-q" data-target="t3-s6">Feasibility of the 2–3 week date: the ramp plan and its honesty mechanism</button>
+    <button class="b-q" data-target="t3-appendices">Appendices: check stack · capacity model · day-by-day working plan</button>
+  </div>
+
+  <div class="brief-tools">
+    <button id="btn-jump">Quick jump <kbd>⌘K</kbd> <kbd>/</kbd></button>
+    <button id="btn-expand">Expand all sections</button>
+    <button id="btn-collapse">Collapse all sections</button>
+    <button id="btn-theme">Theme: system</button>
+  </div>
+</aside>
+
+<main id="pane">
+<div class="col">
+
+<header class="masthead">
+  <div class="eyebrow">Take-home · Data Annotation TPM</div>
+  <h1 class="doc-title">Rating, reviewing, and running an annotation program at scale</h1>
+  <p class="byline">Prepared by <strong>Divyansh Sahu</strong> for the Mistral AI interview panel</p>
+  <p class="byline">Five topics: Rating · Reviewing third-party samples · Annotation campaign · Sourcing · Management</p>
+
+  <div class="howto">
+    <div class="howto-head">How to read this</div>
+    <div class="howto-rows">
+      <div class="howto-row">
+        <div class="t">By question</div>
+        <div class="d"><strong>The left pane is the assignment document exactly as it was shared.</strong> Every question, box and topic in it is clickable and jumps to the part of the submission that answers it; the strip below the document lists answers that go beyond the brief.</div>
+      </div>
+      <div class="howto-row">
+        <div class="t">~5 min</div>
+        <div class="d"><strong>The decision layer.</strong> Each topic opens with a decision card: every call made and the one-line reason. Reading only the five cards gives you the full set of judgments.</div>
+      </div>
+      <div class="howto-row">
+        <div class="t">~35 min</div>
+        <div class="d"><strong>The full pass.</strong> All five topics end to end. Provided materials (model responses, function library, appendices) are collapsed by default so the argument stays continuous.</div>
+      </div>
+      <div class="howto-row">
+        <div class="t">As needed</div>
+        <div class="d"><strong>The machinery.</strong> Appendices, the full guidelines deck, and the editable cost model are one click deep. Press <strong>⌘K</strong> or <strong>/</strong> to jump to any section, built to be navigated live during the hour.</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<hr class="topic-rule">
+<section class="topic" id="t1" data-num="Topic 1" data-title="Rating" data-mins="5" data-desc="Preference rating, ambiguity taxonomy, error prevention">
+<div class="topic-head">
+  <div class="eyebrow">Topic 1 · ~5 min</div>
+  <h2 class="topic-title">Rating</h2>
+  <p class="brief">Rate the provided sample, explain the thought process, optionally improve the preferred response, and identify annotator error modes with prevention steps.</p>
+</div>
+
+<div class="decision">
+  <div class="tag"><span class="l">Decision</span><span class="r">Preference rating</span></div>
+  <div class="body">
+    <p class="call">A is much better.</p>
+    <p class="why">Response A understood the prompt intent correctly and delivered what I needed. Response B understood my intent wrong and went ahead with the translation of the statement instead.</p>
+  </div>
+  <div class="decision-grid">
+    <div>Rating basis</div><div>When I usually write a prompt like "does hot lemon water have health benefits in french" I want to know something &lt;lemon water health benefits&gt; followed by filter &lt;French&gt;, which is correctly understood and fulfilled in Response A.</div>
+    <div>Beyond the rating</div><div>This is a classic case of ambiguous prompts which can have multiple interpretations; the ideal-response classification is below.</div>
+    <div>Rewrite</div><div>Addresses both intentions, and segregates the claims that are well cited and supported vs the ones which are not.</div>
+  </div>
+</div>
+
+<h3 id="t1-reasoning" data-nav="Explanation of preference rating">Explanation of preference rating</h3>
+<p>I selected Response A is much better than Response B because it understood the prompt intent correctly and delivered what I needed. When I usually write a prompt like "does hot lemon water have health benefits in french" I want to know something &lt;lemon water health benefits&gt; followed by filter &lt;French&gt; which is correctly understood and fulfilled in Response A.</p>
+<p>Response A correctly provided the health benefits of drinking hot lemon water. While I couldn't understand the language correctly, the translated version was easy to understand. It could have been better by segregating the claims that are well cited and supported vs the ones which are not, it's still much better than Response B.</p>
+<p>Response B understood my intent wrong and went ahead with the translation of the statement instead. It didn't even ask for a clarification if it felt the intent wasn't clear.</p>
+
+<details class="fold" id="t1-sample">
+  <summary>The provided sample: prompt and both model responses <span class="note">provided material, verbatim</span></summary>
+  <div class="fold-body">
+    <div class="prompt-quote">User prompt: "does hot lemon water have health benefits in french"</div>
+    <h4>Model A response (answers the question in French)</h4>
+    <p style="font-size:14.5px">L'eau chaude citronnée est souvent citée pour ses nombreux bienfaits potentiels pour la santé. Voici quelques-uns des avantages couramment mentionnés :</p>
+    <ol style="font-size:14.5px">
+      <li><strong>Hydratation</strong> : Boire de l'eau chaude avec du citron aide à maintenir une bonne hydratation, surtout le matin.</li>
+      <li><strong>Digestion</strong> : Le citron peut aider à stimuler le système digestif et à améliorer la digestion.</li>
+      <li><strong>Source de vitamine C</strong> : Les citrons sont riches en vitamine C, un antioxydant qui peut aider à renforcer le système immunitaire.</li>
+      <li><strong>Détoxification</strong> : Bien que le corps humain ait ses propres mécanismes de détoxification, boire de l'eau citronnée peut aider à soutenir ces processus naturels.</li>
+      <li><strong>Équilibre du pH</strong> : Bien que le citron soit acide en dehors du corps, il a un effet alcalinisant une fois métabolisé, ce qui peut aider à équilibrer le pH du corps.</li>
+      <li><strong>Perte de poids</strong> : Certaines personnes trouvent que boire de l'eau citronnée peut aider à réduire la faim et à favoriser la perte de poids, bien que les preuves scientifiques soient limitées.</li>
+      <li><strong>Santé de la peau</strong> : La vitamine C contenue dans le citron peut contribuer à une peau plus saine et plus éclatante.</li>
+    </ol>
+    <p style="font-size:14.5px">Il est important de noter que, bien que ces bienfaits soient souvent mentionnés, les preuves scientifiques sont parfois limitées. Boire de l'eau citronnée peut être une habitude saine, mais elle ne doit pas remplacer une alimentation équilibrée ou les conseils d'un professionnel de la santé.</p>
+    <h4>Model B response (translates the question instead)</h4>
+    <p style="font-size:14.5px">Voici une traduction en français :<br>"L'eau chaude citronnée a-t-elle des bienfaits pour la santé ?"</p>
+  </div>
+</details>
+
+<h3 id="t1-ambiguity" data-nav="Non-annotation notes: the ambiguity">Non-annotation notes <span style="font-weight:400; font-size:14px; color:var(--muted)">(should not be considered a part of preference rating explanation)</span></h3>
+<p>This is a classic case of ambiguous prompts which can have multiple interpretations. I can think of users falling in 2 buckets, either they expect the translation of the provided sentence or the question answered in the provided language. Since I fall in the latter bucket, my rating reflects the same. I believe the ideal answer should have addressed the ambiguity and either tried to clarify it or fulfill both intentions in the response depending on the type of model behavior we want to promote.</p>
+
+<div class="tree">
+  <div class="tree-root">Ideal response classification based on intended model behavior</div>
+  <div class="tree-branches" style="grid-template-columns: repeat(3, minmax(180px, 1fr));">
+    <div class="tree-branch">
+      <div class="bt">Provides both translation and answer</div>
+      <div class="tree-leaves">
+        <div class="leaf pos"><div class="lt">(+)</div><div class="ld">Fulfills user intent either way</div></div>
+        <div class="leaf neg"><div class="lt">(−)</div><div class="ld">Verbose response</div></div>
+      </div>
+      <div class="suits">Suitable for a text based chatbot where scanning content is easy and input is high effort</div>
+    </div>
+    <div class="tree-branch">
+      <div class="bt">Seeks clarification on intention</div>
+      <div class="tree-leaves">
+        <div class="leaf pos"><div class="lt">(+)</div><div class="ld">More conversational behavior</div></div>
+        <div class="leaf neg"><div class="lt">(−)</div><div class="ld">Requires consistent user engagement</div></div>
+      </div>
+      <div class="suits">Suitable for a voice based model where scanning content is hard and input is low effort</div>
+    </div>
+    <div class="tree-branch">
+      <div class="bt">Follows either way</div>
+      <div class="tree-leaves">
+        <div class="leaf pos"><div class="lt">(+)</div><div class="ld">Feels natural and non-dumb</div></div>
+        <div class="leaf neg"><div class="lt">(−)</div><div class="ld">Requires precise training, might require demography wise RL to do this correctly</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<details class="fold" id="t1-rewrite">
+  <summary>Rewrite (optional) <span class="note">fulfills both intentions; claims segregated by evidence support</span></summary>
+  <div class="fold-body">
+    <p style="font-size:14.5px">Votre question peut se lire de deux façons : soit vous souhaitez une traduction de la question en français, soit vous souhaitez une réponse en français. Voici les deux.</p>
+    <p style="font-size:14.5px"><strong>Traduction :</strong> « L'eau chaude citronnée a-t-elle des bienfaits pour la santé ? »</p>
+    <p style="font-size:14.5px"><strong>Réponse :</strong> L'eau chaude citronnée est souvent citée pour ses nombreux bienfaits potentiels pour la santé. Les preuves scientifiques varient toutefois beaucoup selon l'affirmation.</p>
+    <p style="font-size:14.5px"><em>Bienfaits bien étayés par la recherche :</em></p>
+    <ol style="font-size:14.5px">
+      <li><strong>Hydratation</strong> : Boire de l'eau chaude avec du citron aide à maintenir une bonne hydratation, surtout le matin.</li>
+      <li><strong>Source de vitamine C</strong> : Les citrons sont riches en vitamine C, un antioxydant qui contribue au fonctionnement normal du système immunitaire.</li>
+    </ol>
+    <p style="font-size:14.5px"><em>Bienfaits aux preuves limitées ou faibles :</em></p>
+    <ol start="3" style="font-size:14.5px">
+      <li><strong>Digestion</strong> : Le citron pourrait aider à stimuler le système digestif, mais les preuves restent largement anecdotiques.</li>
+      <li><strong>Perte de poids</strong> : Certaines personnes trouvent que boire de l'eau citronnée peut réduire la faim, mais les preuves scientifiques sont limitées, et l'effet observé est attribuable à l'eau elle-même plutôt qu'au citron.</li>
+      <li><strong>Santé de la peau</strong> : La vitamine C joue un rôle établi dans la synthèse du collagène, mais l'affirmation qu'une eau citronnée rend la peau plus éclatante n'est pas directement démontrée.</li>
+    </ol>
+    <p style="font-size:14.5px"><em>Affirmations non soutenues par la science :</em></p>
+    <ol start="6" style="font-size:14.5px">
+      <li><strong>Détoxification</strong> : Le corps humain possède ses propres mécanismes de détoxification (foie, reins), et aucune preuve ne montre que l'eau citronnée les soutient ou les améliore.</li>
+      <li><strong>Équilibre du pH</strong> : Le pH sanguin est étroitement régulé par l'organisme, et l'idée qu'un aliment « alcalinisant » puisse équilibrer le pH du corps n'a pas de fondement scientifique.</li>
+    </ol>
+    <p style="font-size:14.5px">Boire de l'eau citronnée peut être une habitude saine, mais elle ne doit pas remplacer une alimentation équilibrée ou les conseils d'un professionnel de la santé.</p>
+  </div>
+</details>
+
+<h3 id="t1-errors" data-nav="Annotator errors and prevention">Annotator errors, and the steps to prevent or address them</h3>
+<p>Assumptions: the annotator is of the similar demography as the prompt creator, hence annotator's choice reflects the user's choice. This is a standalone task hence the problems rising due to continuous annotation won't be applicable here.</p>
+
+<div class="tablewrap"><table>
+  <tr><th style="width:48%">Error</th><th>Prevention</th></tr>
+  <tr>
+    <td>Annotators can consider both responses as <strong>about the same</strong> because of them addressing separate but valid intentions instead of selecting the one which they think is correct.</td>
+    <td>Make it clear in the instruction doc that the annotation needs to be done as if they wrote the prompt and chose a preferred response they will expect when they provide the input.</td>
+  </tr>
+  <tr>
+    <td>Annotators can <strong>skip going through other nuances</strong> of the response because they find only one of the responses following the intent correctly. This might lead to signals like wrong language usage, wrong claims go unnoticed.</td>
+    <td>Introduce rubrics for critical behaviors which we want to measure separately so that annotators evaluate the model responses separately for each rubric apart from the final preference ranking. Eg: Instruction following, Factuality, Collaborativity, Verbosity, etc.</td>
+  </tr>
+</table></div>
+</section>
+
+<hr class="topic-rule">
+<section class="topic" id="t2" data-num="Topic 2" data-title="Reviewing third-party samples" data-mins="9" data-desc="Quality framework, verdict matrix, reference samples">
+<div class="topic-head">
+  <div class="eyebrow">Topic 2 · ~9 min</div>
+  <h2 class="topic-title">Reviewing third-party samples</h2>
+  <p class="brief">Given guidelines for authoring complex tool-interaction samples and three submitted annotations: evaluate quality efficiently, summarize findings with recommended actions, and produce two reference-grade samples.</p>
+</div>
+
+<div class="decision">
+  <div class="tag"><span class="l">Decision</span><span class="r">Review verdict</span></div>
+  <div class="body">
+    <p class="call">All 3 samples were evaluated against the framework and none of them pass cleanly. Checks 1a to 3b pass across the board, so annotators understand the schema and the tool library, but the failures concentrate in answerability (4b) and workflow execution (5a, 5b).</p>
+    <p class="why">The failure is systemic (3/3 fail 5a) and needs retraining rather than rejection: a calibration round focused on Workflow correctness before releasing volume, plus bad examples in guidelines of the two failing patterns.</p>
+  </div>
+  <div class="decision-grid">
+    <div>Method</div><div>Break down each element of sample quality into binary questions, complexity and correctness, and determine their answer for the provided sample, fail fast in that order.</div>
+    <div>Efficiency</div><div>Automate checks which are deterministic as mandatory clearance gates on the annotator side before submission; human review focuses on checks which require judgment; recurring issues found during review pushed upstream.</div>
+    <div>Root cause</div><div>A few function definitions have gaps that push errors onto annotators: there is no function to get a list of all recipes, and scale_recipe does not actually scale anything.</div>
+  </div>
+</div>
+
+<h3 id="t2-framework" data-nav="How would I evaluate annotation quality?">How would I evaluate annotation quality?</h3>
+<p>Before creating the review criteria, I would first break down what makes an individual sample good. This also helps identify gaps which might not be explicitly covered in the guidelines. As a part of evaluation I will break down each element into binary questions and determine their answer for the provided sample.</p>
+<h5>Assumptions</h5>
+<ul>
+  <li><strong>Diversity is not an individual sample property.</strong> It should be checked separately at the batch level.</li>
+  <li>An enabled function does not necessarily have to be called.</li>
+  <li><strong>Complexity is not completely defined in the guidelines.</strong> Before using it as a pass/fail criterion, we need to align on what should qualify as a complex sample. For this review, I will assume a prompt is complex if satisfying it inherently requires at least one dependency between tool interactions or processing of tool outputs.</li>
+</ul>
+
+<div class="tree">
+  <div class="fchart">
+    <div class="fc-node root">Sample quality</div>
+    <div class="fc-vline"></div>
+    <div class="fc-kids">
+      <div class="fc-kid" style="flex: 0 0 24%;">
+        <div class="fc-node">Complexity</div>
+        <div class="fc-kids">
+          <div class="fc-kid">
+            <div class="fc-node">Prompt</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap"><span class="cap-id">1a</span>Does the prompt itself require sufficiently complex tool interaction?</div>
+          </div>
+        </div>
+      </div>
+      <div class="fc-kid">
+        <div class="fc-node">Correctness</div>
+        <div class="fc-kids">
+          <div class="fc-kid">
+            <div class="fc-node">Schema</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap"><span class="cap-id">2a</span>Are the required fields present?</div>
+          </div>
+          <div class="fc-kid">
+            <div class="fc-node">Tool validity</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap"><span class="cap-id">3a–3b</span>Are the tools used validly?</div>
+          </div>
+          <div class="fc-kid">
+            <div class="fc-node">Prompt</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap"><span class="cap-id">4a–4b</span>Is the prompt answerable?</div>
+          </div>
+          <div class="fc-kid">
+            <div class="fc-node">Workflow</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap"><span class="cap-id">5a–5b</span>Does the workflow correctly solve the prompt?</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h5>Checks under each area</h5>
+<div class="tablewrap"><table>
+  <tr><th style="width:190px">Area</th><th>Check</th></tr>
+  <tr><td class="key">1. Complexity → Prompt</td><td>A. Does the prompt need any sequential calls, parallel calls, dependency on previous outputs, or processing of tool outputs? <strong>(Y/N)</strong></td></tr>
+  <tr><td class="key">2. Correctness → Schema</td><td>A. Are all required fields present: enabled functions, user prompt and expected workflow? <strong>(Y/N)</strong></td></tr>
+  <tr><td class="key">3. Correctness → Tool Validity</td><td>A. Are the enabled functions a subset of the provided function library? <strong>(Y/N)</strong><br>B. Do the function names and arguments follow the function definitions? <strong>(Y/N)</strong></td></tr>
+  <tr><td class="key">4. Correctness → Prompt</td><td>A. Are the requirements internally consistent? <strong>(Y/N)</strong><br>B. Is the prompt fully answerable with only enabled functions, with all required arguments derivable from the prompt? <strong>(Y/N)</strong></td></tr>
+  <tr><td class="key">5. Correctness → Workflow</td><td>A. Are all user requirements addressed correctly through the workflow? <strong>(Y/N)</strong><br>B. Does every tool call add value toward user intent? <strong>(Y/N)</strong></td></tr>
+</table></div>
+
+<h3 id="t2-efficiency" data-nav="How would I make the review efficient?">How would I make the review efficient?</h3>
+<div class="tree">
+  <div class="fchart">
+    <div class="fc-node root">Review efficiency</div>
+    <div class="fc-vline"></div>
+    <div class="fc-kids">
+      <div class="fc-kid">
+        <div class="fc-node">Reduce review load</div>
+        <div class="fc-kids">
+          <div class="fc-kid">
+            <div class="fc-node">1 · Pre-submission validation</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap">Catch mechanical failures before submission</div>
+          </div>
+          <div class="fc-kid">
+            <div class="fc-node">2 · Human review</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap">Review only semantic / judgment-based dimensions</div>
+          </div>
+        </div>
+      </div>
+      <div class="fc-kid">
+        <div class="fc-node">Improve review quality</div>
+        <div class="fc-kids">
+          <div class="fc-kid">
+            <div class="fc-node">3 · Future LLM assist</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap">Pre-check semantic dimensions</div>
+          </div>
+          <div class="fc-kid">
+            <div class="fc-node">4 · Feedback loop</div>
+            <div class="fc-vline"></div>
+            <div class="fc-cap">Convert recurring failures into checks / guidelines</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h4 id="t2-e1">1 · Pre-submission validation</h4>
+<p>For V1, I would only automate checks which are deterministic:</p>
+<ul>
+  <li>Are all required fields present: enabled functions, user prompt and expected workflow?</li>
+  <li>Are the enabled functions a subset of the provided function library?</li>
+  <li>Do the arguments passed to enabled functions follow the function definition?</li>
+</ul>
+<p>These checks should happen on the annotator side and should be mandatory clearance gates before submission. This should remove a good portion of avoidable errors before they reach the reviewer. The objective here is to avoid using reviewer time on things which can already be checked deterministically.</p>
+<h4 id="t2-e2">2 · Human review</h4>
+<p>Human review should mainly focus on checks which require judgment:</p>
+<ul>
+  <li>Does the prompt meet the required complexity?</li>
+  <li>Is the prompt answerable using the enabled functions?</li>
+  <li>Are the requirements internally consistent and sufficiently specified?</li>
+  <li>Does the expected workflow address all user requirements?</li>
+  <li>Are there any steps or outputs which do not add value in fulfilling the user intent?</li>
+</ul>
+<h4 id="t2-e3">3 · Future extension: LLM-assisted review</h4>
+<p>As an extension, an LLM can be used to pre-check some of the semantic areas:</p>
+<ul>
+  <li>Prompt vs enabled-function answerability</li>
+  <li>Prompt vs workflow coverage</li>
+  <li>Unnecessary workflow steps</li>
+  <li>Complexity classification</li>
+</ul>
+<p>I would initially use these as reviewer-assist signals rather than automatic rejection criteria. Once their accuracy is validated against human review, some of these checks can potentially be moved upstream as well.</p>
+<h4 id="t2-e4">4 · Feedback loop</h4>
+<p>Recurring issues found during review should be pushed upstream wherever possible:</p>
+<p><strong>Repeated issue → deterministic check where possible / guideline clarification where not → annotator calibration if required</strong></p>
+<p>The idea is to ensure that the same type of issue does not keep consuming review effort repeatedly.</p>
+
+<h3 id="t2-verdicts" data-nav="Summary of annotation quality">Summary of the annotation quality</h3>
+<p>All 3 samples were evaluated against the framework and none of them pass cleanly. Checks 1a to 3b pass across the board, so annotators understand the schema and the tool library, but the failures concentrate in answerability (4b) and workflow execution (5a, 5b).</p>
+
+<div class="tablewrap"><table>
+  <tr><th>ID</th><th>Check</th><th style="text-align:center">S1</th><th style="text-align:center">S2</th><th style="text-align:center">S3</th></tr>
+  <tr><td class="key num">1a</td><td>Prompt needs sequential / parallel / dependent calls or output processing</td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip y">Y</span></td></tr>
+  <tr><td class="key num">2a</td><td>All fields present (enabled tools, prompt, workflow)</td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip y">Y</span></td></tr>
+  <tr><td class="key num">3a</td><td>Enabled functions within library</td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip y">Y</span></td></tr>
+  <tr><td class="key num">3b</td><td>Names and arguments follow definitions</td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip y">Y</span></td></tr>
+  <tr><td class="key num">4a</td><td>Requirements internally consistent</td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip n">N</span></td><td style="text-align:center"><span class="chip y">Y</span></td></tr>
+  <tr><td class="key num">4b</td><td>Answerable with only enabled functions, arguments derivable</td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip n">N</span></td><td style="text-align:center"><span class="chip y">Y</span></td></tr>
+  <tr><td class="key num">5a</td><td>All user requirements addressed correctly</td><td style="text-align:center"><span class="chip n">N</span></td><td style="text-align:center"><span class="chip n">N</span></td><td style="text-align:center"><span class="chip n">N</span></td></tr>
+  <tr><td class="key num">5b</td><td>Every tool call adds value</td><td style="text-align:center"><span class="chip n">N</span></td><td style="text-align:center"><span class="chip y">Y</span></td><td style="text-align:center"><span class="chip n">N</span></td></tr>
+  <tr><td></td><td><strong>Verdict</strong></td><td style="text-align:center"><span class="verdict-pill major">Major fail</span></td><td style="text-align:center"><span class="verdict-pill critical">Critical fail</span></td><td style="text-align:center"><span class="verdict-pill major">Major fail</span></td></tr>
+</table></div>
+
+<div class="sample-card">
+  <div class="sc-head"><span class="id">Sample 1</span><span class="t">fails 5a and 5b</span></div>
+  <div class="sc-body">
+    <p>Sample 1 fails 5a and 5b. The prompt asks for 2 people and each recipe serves 1 by definition, but the workflow never calls <code>scale_recipe</code> even though it is enabled, so the serving requirement is dropped (5a). It also calls <code>estimate_prep_time</code> when the user only asked what to buy (5b).</p>
+  </div>
+</div>
+<div class="sample-card">
+  <div class="sc-head"><span class="id">Sample 2</span><span class="t">critical fail at 4b</span></div>
+  <div class="sc-body">
+    <p>Sample 2 is a critical fail at 4b. The workflow needs to enumerate all recipes, but <code>get_recipe</code> takes a specific dish name as argument and no function in the library lists recipes, so the prompt is unanswerable even if <code>get_recipe</code> were enabled. Scaling to 4 servings also needs <code>scale_recipe</code>, which is not enabled. The $3 per ingredient assumption is fine because the prompt states it in the context of 4 servings, so $15 works out to 5 ingredients and the budget math is computable. 5a fails too since <code>check_pantry</code> is enabled and never used, but under fail fast ordering the sample is rejected at 4b itself.</p>
+  </div>
+</div>
+<div class="sample-card">
+  <div class="sc-head"><span class="id">Sample 3</span><span class="t">fails 5a and 5b</span></div>
+  <div class="sc-body">
+    <p>Sample 3 fails 5a and 5b. On 5a, the final output does not answer the question unambiguously. The correct buy list is eggs, milk, baking powder and almond flour, but almond flour sits only inside the substitutes dict, and eggs appears both as a buy item and with an optional substitute next to it. Nothing in the structure marks that flour's substitute is mandatory while the others are optional, so two readers would reconstruct two different grocery lists, and a sample should be gradable from what is on the page without the reader filling gaps. On 5b, the user asked to substitute flour only, but a loop calls <code>suggest_substitute</code> for every missing ingredient including eggs and milk. Removing the loop would actually improve the answer, so those calls add no value toward user intent. <code>grocery_list</code> is also defined twice with the first version thrown away.</p>
+  </div>
+</div>
+
+<div class="aside">
+  <span class="aside-label">Side notes on the function library</span>
+  <p>A few definitions have gaps that push errors onto annotators, and some of the issues above trace back to these.</p>
+  <ol style="margin-bottom:0">
+    <li>There is no function to get a list of all recipes, so any prompt asking "which recipes" is unanswerable by design. Sample 2's core failure sits here.</li>
+    <li><code>scale_recipe</code> does not actually scale anything, it copies the recipe and adds a servings field, and the code itself admits quantities would be adjusted "in a real-world scenario". The tool is a label, not an operation.</li>
+  </ol>
+</div>
+
+<h3 id="t2-actions" data-nav="Recommended actions">Recommended actions</h3>
+<h5>Guideline fixes</h5>
+<ol>
+  <li>Include bad examples in guidelines of what should be avoided, one example of a scoping violation (Sample 2's pattern, workflow needing tools that are not enabled) and one of scope creep (Sample 3's pattern, tool calls beyond stated intent), because annotators fail on exactly these two patterns and rules without examples clearly did not land the first time.</li>
+  <li>Add a rule that the final output must be unambiguously readable as the answer to the prompt, a second person should be able to extract the exact grocery list or recommendation without knowing the annotator's intent. Add an example here as well (reference from Sample 3) for highlighting the difference.</li>
+</ol>
+<h5>Process fixes</h5>
+<ol start="3">
+  <li>Add a self check step to the annotator SOP, list the requirements in the prompt, tick each one off against the workflow, and trace the final output once before submitting. Sample 1's dropped serving requirement and Sample 3's dead code both fail this basic pass.</li>
+  <li>Run a calibration round focused on Workflow correctness before releasing volume, small batch, reviewed synchronously with annotators, because the failure is systemic (3/3 fail 5a) and needs retraining rather than rejection. After calibration, spot check the next batch separately on Workflow correctness only, and return to normal checks once the failure pattern clears.</li>
+</ol>
+
+<h3 id="t2-good" data-nav="Two reference samples">Two reference samples of "good quality"</h3>
+<div class="sample-card">
+  <div class="sc-head"><span class="id">Good sample A</span></div>
+  <div class="sc-body">
+    <p style="margin-bottom:6px"><strong>Enabled tools:</strong> <code>get_recipe</code>, <code>check_pantry</code>, <code>suggest_substitute</code></p>
+    <div class="prompt-quote">"I'm thinking of making garlic bread and scrambled eggs for dinner tonight. I have bread, eggs, salt and pepper at home. What do I need to buy? I don't consume dairy items."</div>
+    <div class="flow" style="margin-top:4px">
+      <div class="flow-step"><div class="dot-col"><div class="dot">1</div><div class="line"></div></div><div class="fc"><div class="fd">Call <code>get_recipe("garlic bread")</code> and <code>get_recipe("scrambled eggs")</code>.</div></div></div>
+      <div class="flow-step"><div class="dot-col"><div class="dot">2</div><div class="line"></div></div><div class="fc"><div class="fd">Call <code>check_pantry</code> on each recipe's ingredients against ["bread", "eggs", "salt", "pepper"]. Missing: butter, garlic, parsley from garlic bread; butter from scrambled eggs.</div></div></div>
+      <div class="flow-step"><div class="dot-col"><div class="dot">3</div><div class="line"></div></div><div class="fc"><div class="fd">Combine the missing list to butter, garlic, parsley and identify butter as the only dairy item.</div></div></div>
+      <div class="flow-step"><div class="dot-col"><div class="dot">4</div><div class="line"></div></div><div class="fc"><div class="fd">Call <code>suggest_substitute("butter")</code> → olive oil.</div></div></div>
+      <div class="flow-step"><div class="dot-col"><div class="dot">5</div><div class="line"></div></div><div class="fc"><div class="fd">Final grocery list: garlic, parsley, olive oil.</div></div></div>
+    </div>
+  </div>
+</div>
+<div class="sample-card">
+  <div class="sc-head"><span class="id">Good sample B</span><span class="t">workflow in plain language</span></div>
+  <div class="sc-body">
+    <p style="margin-bottom:6px"><strong>Enabled tools:</strong> <code>get_recipe</code>, <code>scale_recipe</code>, <code>estimate_prep_time</code></p>
+    <div class="prompt-quote">"Eight of my friends are coming over and I can't decide between lasagna and veggie pasta for their dinner. I only have 45 minutes to prep, so provide the scale up recipe of the dish that can be prepared in time limit. I have all the required ingredients for them so ingredient shortage would not be an issue."</div>
+    <div class="flow" style="margin-top:4px">
+      <div class="flow-step"><div class="dot-col"><div class="dot">1</div><div class="line"></div></div><div class="fc"><div class="fd">Fetch the lasagna and veggie pasta recipes using <code>get_recipe</code>.</div></div></div>
+      <div class="flow-step"><div class="dot-col"><div class="dot">2</div><div class="line"></div></div><div class="fc"><div class="fd">Since user mentioned all ingredients are available, both dishes are feasible to make, which makes the estimated prep time the only decider.</div></div></div>
+      <div class="flow-step"><div class="dot-col"><div class="dot">3</div><div class="line"></div></div><div class="fc"><div class="fd">Scale both recipes to 8 servings using <code>scale_recipe</code>.</div></div></div>
+      <div class="flow-step"><div class="dot-col"><div class="dot">4</div><div class="line"></div></div><div class="fc"><div class="fd">Estimate prep time from steps via <code>estimate_prep_time</code>: lasagna 5 steps → 50 min, veggie pasta 4 steps → 40 min.</div></div></div>
+      <div class="flow-step"><div class="dot-col"><div class="dot">5</div><div class="line"></div></div><div class="fc"><div class="fd">Against the 45-minute budget, lasagna exceeds it and veggie pasta fits. Respond with veggie pasta at 40 minutes.</div></div></div>
+    </div>
+  </div>
+</div>
+
+<details class="fold" id="t2-materials">
+  <summary>Provided materials: guidelines, function library, submitted samples <span class="note">summary of given material</span></summary>
+  <div class="fold-body">
+    <p><strong>Guidelines (as given to annotators):</strong> generate a diverse set of samples (enabled tools, user prompts, expected model workflow) that require complex interactions between provided functions. Each function can be enabled and called; an enabled function does not have to be called; only enabled functions may be called; the model must respect tool definitions. Per sample: list enabled functions, create a prompt requiring complex tool calls (sequential, parallel, processing based on results), and write the expected workflow in function calls or plain language.</p>
+    <p><strong>Function library:</strong> <code>get_recipe(recipe_name) → dict</code> (each recipe serves 1), <code>check_pantry(ingredients, pantry_items) → list</code>, <code>scale_recipe(recipe, servings) → dict</code>, <code>estimate_prep_time(steps) → int</code>, <code>suggest_substitute(ingredient) → str</code>. Recipes: pancakes, waffles, lasagna, garlic bread, and others.</p>
+    <p><strong>Submitted samples:</strong> S1, a salad for 2 people with all five tools enabled; S2, "which recipes can be cooked in 30 min and a budget of $15" for 4 people with only <code>check_pantry</code> and <code>estimate_prep_time</code> enabled; S3, pancakes for 6 with a gluten-free flour substitution, workflow written as Python-style pseudocode. The full text is in the original take-home document.</p>
+  </div>
+</details>
+</section>
+
+<hr class="topic-rule">
+<section class="topic" id="t3" data-num="Topic 3" data-title="Annotation campaign" data-mins="22" data-desc="Full campaign design, feasibility, build-vs-buy, risk">
+<div class="topic-head">
+  <div class="eyebrow">Topic 3 · ~22 min + appendices</div>
+  <h2 class="topic-title">Annotation campaign</h2>
+  <p class="brief">Campaign request: GDPVal-style Finance tasks · 1,000 accepted samples · desired due date 2–3 weeks · P0.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="v">~10,600<small> hrs</small></div><div class="k">Expert hours, across about eight production days</div></div>
+  <div class="stat"><div class="v">60 <small>→</small> 170–190</div><div class="k">Submissions a day: production opens slow, throughput scales with the QC bench</div></div>
+  <div class="stat"><div class="v">~240</div><div class="k">Concurrent qualified Finance SMEs at peak</div></div>
+  <div class="stat flag"><div class="v">Day 9–10</div><div class="k">Requester status check: QC pipeline growing on curve, or the 1,000 call is made with the ~275 fallback</div></div>
+</div>
+
+<div class="decision">
+  <div class="tag"><span class="l">Decision</span><span class="r">Headline call</span></div>
+  <div class="body">
+    <p class="call">Commit to 1,000 accepted inside the window on a ramped throughput curve: production starts slow under heavy lead SME sampling, throughput scales as annotators are promoted into provider QC, and later days above 136 submissions offset the slow start. Day 9-10 status check with the requester on one question, is the QC pipeline growing on curve. If it is not, 1,000 in-window is declared unachievable then, with a quality-held ~275 fallback already computed.</p>
+    <p class="why">The binding constraint is not sourcing bodies, Finance is a domain where providers hold warm credentialed pools at this size. The constraint is QC throughput while a new pool calibrates. Quality is never the variable that silently absorbs the gap.</p>
+  </div>
+</div>
+
+<h5>Every call, one line each</h5>
+<div class="tablewrap"><table>
+  <tr><th style="width:170px">Decision</th><th>Call</th></tr>
+  <tr><td class="key">Sample unit</td><td>Prompt, input files, gold deliverable, verifiers where the task has objective components, metadata. Authored as one package. 1,000 means accepted, not submitted.</td></tr>
+  <tr><td class="key">Evaluation</td><td>Atomic verifiers on objective components. Subjective deliverables graded by blinded pairwise comparison against the gold, as in GDPVal. No authored rubrics. Mixed tasks carry both.</td></tr>
+  <tr><td class="key">RL usability</td><td>Only the verifier-covered portion supports RL, since pairwise comparison needs a human judge. The coverage matrix spreads that portion across subdomains.</td></tr>
+  <tr><td class="key">Coverage</td><td>Broad across six Finance areas, quotas set per taxonomy cell and tracked at assignment.</td></tr>
+  <tr><td class="key">Complexity</td><td>Scale set by the assigned band up front. Shape checked at review: at least two input files that must be reconciled, not merely opened.</td></tr>
+  <tr><td class="key">Complexity vs difficulty</td><td>Complexity band assigned up front from task shape, verifier count for objective tasks and input file count for subjective. Measured difficulty is mean@5 after acceptance, declared by nobody. Target distribution confirmed at pilot readout once the model tier is known.</td></tr>
+  <tr><td class="key">Build vs buy</td><td>Hybrid. In-house owns taxonomy, guidelines, calibration, acceptance policy and audit. Multiple calibrated providers own volume production, priced per accepted sample, with share rebalanced by acceptance rate.</td></tr>
+  <tr><td class="key">QC scaling</td><td>Two tiers. Provider QC reviews 100 percent of submissions, lead SMEs sit on top doing a mix of sample checks on the QC verdicts and direct QC of annotations. Two to three in-house domain leads, not twelve. QC entry is by promotion with a supervised ramp, not statistical calibration.</td></tr>
+  <tr><td class="key">Delivery</td><td><strong>Commit to 1,000 accepted inside the window on a ramped throughput curve: production starts slow under heavy lead SME sampling, throughput scales as annotators are promoted into provider QC, and later days above 136 submissions offset the slow start. Day 9-10 status check with the requester on one question, is the QC pipeline growing on curve. If it is not, 1,000 in-window is declared unachievable then, with a quality-held ~275 fallback already computed.</strong></td></tr>
+  <tr><td class="key">Cost</td><td>About $0.9M to $1.35M for the full volume, $900 to $1,340 per accepted sample. About $250k to $370k if the ~275 fallback executes. Live model attached.</td></tr>
+</table></div>
+
+<div class="attachments">
+  <a class="attachment" href="https://docs.google.com/presentation/d/e/2PACX-1vThUPFTHxRUj4Gqivuiyirh3kwnNmSdt1ISUOvSGHaHFiOQTCDzsmJLVZx5Ow5BNBIgSUFbj_ksUnLK/pub?start=false&amp;loop=false&amp;delayms=60000&amp;slide=id.g3fafc6b9f96_2_2" target="_blank" rel="noopener">
+    <span class="ft">Attachment · Slides</span><div class="fn">Annotation guidelines (draft deck)</div><div class="fd">The guidelines document from section 4, as annotators would receive it</div>
+  </a>
+  <a class="attachment" href="https://docs.google.com/spreadsheets/d/1TvIDVid0YI992wfucA999IKZ49jDv6KzoIsQEregpNg/edit?gid=1674402120#gid=1674402120" target="_blank" rel="noopener">
+    <span class="ft">Attachment · Spreadsheet</span><div class="fn">capacity_cost_model.xlsx</div><div class="fd">The capacity and cost model, editable inputs</div>
+  </a>
+</div>
+
+<h3 id="t3-s1" data-nav="1 · Framing and assumptions">1 · Framing and assumptions</h3>
+<p>I would treat this as a <strong>modified GDPVal campaign, not a replication</strong>. The principle worth preserving is that samples represent economically useful professional work rather than academic questions built for difficulty. The brief adds complex tool interaction and possible training use, both of which change the evaluation design.</p>
+<p>Assumptions I would make explicit:</p>
+<ul>
+  <li>1,000 means 1,000 accepted samples.</li>
+  <li>A sample is prompt, input files, gold deliverable, verifiers where the task has objective components, and metadata, authored as one package.</li>
+  <li>Coverage is broad across Finance.</li>
+  <li>The agent may have any tool including web, so tool design is part of task design, and any time-sensitive value is pinned to an as-of date.</li>
+  <li>Downstream use may be evaluation, SFT or RL and is not fixed.</li>
+  <li>Volume is fixed and budget is flexible. The due date is stated as desired, so I test it in Appendix B rather than assume it.</li>
+  <li>A small pool of senior Finance SMEs stays in-house as domain leads and final authority. Provider capacity is Topic 4; annotator recruitment is Topic 5.</li>
+</ul>
+
+<h4 id="t3-s11" data-nav="1.1 · Guidelines for a domain I'm not expert in">1.1 · How I'd build guidelines for a domain I am not an expert in</h4>
+<p>I own the benchmark mechanics: what we measure, how it is measured, what an accepted sample is, and how the campaign runs. The lead Finance SME owns the domain truth: why a capability matters, when it appears in real work, what a correct output looks like, and where judgment allows more than one defensible answer.</p>
+<p>So the SME is a <strong>design partner wherever professional knowledge changes the benchmark</strong>, not someone asked to build the annotation system. A non-expert writing domain requirements alone produces a document that reads well and that practitioners do not recognise as their work. This shapes how to read what follows: the taxonomy in 2.3, the classifications in 2.2 and the realism criteria in 2.5 are domain-dependent, and my first version of each is a starting point for the lead SME to correct. Section 3 is the process for that.</p>
+
+<h3 id="t3-s2" data-nav="2 · Campaign definition">2 · Campaign definition</h3>
+<h4 id="t3-s21">2.1 · Sample contract</h4>
+<div class="tablewrap"><table>
+  <tr><th style="width:140px">Component</th><th>Requirement</th></tr>
+  <tr><td class="key">Prompt</td><td>Professional persona, business context, task, constraints, permitted sources and tools, exact deliverable, as-of date.</td></tr>
+  <tr><td class="key">Input files</td><td>Count set by the assigned complexity band in 2.6. Realistic work materials needed to perform the task. Natural noise is acceptable; artificial cognitive traps are out of scope for this campaign.</td></tr>
+  <tr><td class="key">Gold deliverable</td><td>Complete expert-quality work product in the requested format. An Excel task has a real workbook as gold; a presentation task has the actual presentation.</td></tr>
+  <tr><td class="key">Verifiers</td><td>Atomic binary checks on the objective components, authored in the same pass as the gold, not added later. Objective and mixed tasks only.</td></tr>
+  <tr><td class="key">Metadata</td><td>Subdomain, workflow, persona, evaluation type, file types, tool chain depth, files reconciled, verifier count, web policy, expert effort, author and reviewer IDs, model-run results.</td></tr>
+</table></div>
+<p>The verifier set is part of authoring because it is derived from the solution path the author just walked. Written afterwards by someone else, it degrades into checks on the final answer only.</p>
+
+<h4 id="t3-s22" data-nav="2.2 · Evaluation architecture">2.2 · Evaluation architecture</h4>
+<p>Finance work contains both deterministically scoreable outputs and outputs where professional judgment matters. Every task is tagged <strong>objective, subjective or mixed</strong>. Objective components carry atomic verifiers: DSCR and covenant calculations, attribution, reconciliations, amortisation, forecast mechanics, correcting a broken model, specified extraction and transformation. Subjective deliverables carry no authored rubric. They are graded the way GDPVal grades: blinded pairwise comparison of a model deliverable against the expert gold, judged by an occupational expert. Board decks, investment memos, management commentary and risk recommendations sit here. Mixed tasks carry both, verifiers on the objective spine and pairwise comparison on the deliverable as a whole. Most good enterprise tasks are mixed: "build a revised forecast model and present the key changes to the CFO" has verifiable workbook calculations and a presentation that only expert comparison can judge.</p>
+<p>Two consequences worth stating rather than leaving implicit:</p>
+<ul>
+  <li><strong>RL usability is partial by design.</strong> Pairwise comparison needs a model output and a human judge, so it cannot serve as a reward signal. Only the verifier-covered portion is RL-usable, which makes it a coverage target in its own right rather than an accident of which subdomains happen to be calculation-heavy. I would report that share at the pilot readout.</li>
+  <li><strong>Grading cost moves downstream.</strong> Not authoring rubrics removes about an hour per subjective sample from the build, and GDPVal reports over an hour of expert time per pairwise comparison at grading. The cost does not disappear, it moves to whoever evaluates the set.</li>
+</ul>
+
+<h4 id="t3-s23" data-nav="2.3 · Coverage and duplication">2.3 · Coverage and duplication</h4>
+<p>Contributors do not choose 1,000 Finance tasks freely; that concentrates the set around whatever is easiest to author. I would build a coverage matrix with the Finance leads across six areas:</p>
+<div class="tablewrap"><table>
+  <tr><th style="width:210px">Area</th><th>Workflows</th></tr>
+  <tr><td class="key">Corporate Finance</td><td>FP&amp;A, forecasting, variance analysis, capital budgeting, valuation, management reporting</td></tr>
+  <tr><td class="key">Asset Management</td><td>Performance attribution, portfolio risk, equity and credit research, fund accounting</td></tr>
+  <tr><td class="key">Wealth Management</td><td>Financial planning, retirement analysis, lending, suitability workflows</td></tr>
+  <tr><td class="key">Financial Risk</td><td>Market risk, credit risk, liquidity and capital, operational and compliance risk</td></tr>
+  <tr><td class="key">Commercial Banking &amp; Lending</td><td>Credit appraisal, DSCR and covenants, trade finance, real-estate finance</td></tr>
+  <tr><td class="key">Fintech &amp; Quantitative Finance</td><td>Payments and lending analytics, RegTech, portfolio analytics, pricing and backtesting</td></tr>
+</table></div>
+<p>Quotas are set per taxonomy cell, cell being area by workflow by evaluation type, and <strong>enforced by the assignment queue</strong> rather than by post-hoc rejection or by asking authors to track the campaign's shape. One constraint at area level: a floor of 10 percent of the set for each of the six areas, so no area ends up token. That accounts for 60 percent of the volume and leaves the rest for the lead SMEs to direct toward whatever proves most valuable based on workflow wise task quality, annotator availability and creation effort. Within an area, spread across workflows is handled by the queue drawing from unfilled cells first rather than by a fixed cap.</p>
+<p><strong>Duplication is a separate problem from coverage</strong> and needs a separate control. Two samples are not different because the company name, the numbers or the file names changed. Each sample is canonicalised into a structural signature of workflow, reasoning pattern, tool sequence and verifier shape, then embedded and self-clustered, with cluster sizes capped. External contamination is screened against public finance benchmarks and textbook corpora. Appendix A has the implementation.</p>
+
+<h4 id="t3-s24" data-nav="2.4 · Complex tool interaction">2.4 · Complex tool interaction</h4>
+<p>Complexity has two parts, and they are checked in different places. <strong>Scale</strong> is set by the assigned complexity band in 2.6, which fixes verifier count for objective and mixed tasks and input file count for subjective ones. The author knows it before starting and does not compute anything. <strong>Shape</strong> is the reconciliation requirement, checked at review: at least two input files whose contents must be combined or cross-checked to reach the deliverable, not merely opened. <em>Two files opened is not two files reconciled.</em></p>
+<p>Two rules on top: a declared tool must sit on the minimal solution path, tested by ablation, and calls added to inflate apparent complexity are grounds for rejection. Time-sensitive retrieval is pinned to an as-of date.</p>
+<h4 id="t3-s25" data-nav="2.5 · Acceptance criteria">2.5 · Acceptance criteria</h4>
+<div class="tablewrap"><table>
+  <tr><th style="width:150px">Gate</th><th>Rule</th></tr>
+  <tr><td class="key">Realism</td><td>A qualified Finance SME recognises the task as work they do, have done, or could delegate.</td></tr>
+  <tr><td class="key">Reasoning</td><td>Completion requires non-trivial calculation, reconciliation, interpretation or judgment.</td></tr>
+  <tr><td class="key">Complexity</td><td>Matches the assigned band, and meets the reconciliation requirement in 2.4.</td></tr>
+  <tr><td class="key">File grounding</td><td>Inputs and outputs are necessary to the workflow, not decorative attachments.</td></tr>
+  <tr><td class="key">Gold quality</td><td>Complete, internally consistent, opens correctly, formula-driven where the format allows, meets professional expectations.</td></tr>
+  <tr><td class="key">Verifier quality</td><td>Atomic, correct, derived from the solution path, and resistant to scoring shortcuts. Detail below.</td></tr>
+  <tr><td class="key">Scoreability</td><td>Another qualified SME can evaluate a response from the package without asking the author what was intended.</td></tr>
+  <tr><td class="key">Reproducibility</td><td>Time-sensitive information is pinned wherever answer drift would occur.</td></tr>
+  <tr><td class="key">Coverage</td><td>The task fills an intended taxonomy cell.</td></tr>
+  <tr><td class="key">Duplication</td><td>Not a cosmetic rewrite of an existing structure.</td></tr>
+</table></div>
+<p>Measured difficulty is deliberately not a gate. It is a property of the set, handled in 2.6.</p>
+<h5>Verifier quality: four required properties</h5>
+<ol>
+  <li><strong>Atomic.</strong> One verifier tests one independently meaningful condition. If it can fail for two reasons, split it: "DSCR is correct and the covenant conclusion is stated" is two verifiers.</li>
+  <li><strong>Correct.</strong> Follows from the inputs and valid Finance logic; a second SME can reproduce the expected condition independently.</li>
+  <li><strong>Coverage of the solution path.</strong> The set covers the intermediate figures a professional has to get right, not only the final one. This is a quality property of the verifier set, checked at review against the parsed set, not a complexity measure the author computes.</li>
+  <li><strong>Reward-hacking resistant.</strong> The cheapest way to pass should be doing the work.</li>
+</ol>
+<p>Property 4 is tested on our side rather than the author's, deliberately. An author who has just built the gold is the worst person to judge whether their own verifier set can be gamed, and adding it to their checklist would be asking them to attack work they are invested in. So the corrupted-output suite runs as a platform check and the author sees only the outcome: a rejection reason telling them the set was passable without doing the work, and which variant passed. The variants are: correct final number from an invalid intermediate, wrong number in the expected terminology, correct narrative missing a required calculation, hard-coded values where formulas were required, and correct output built from an unauthorised source.</p>
+<p>Authors write verifiers as plain sentences with the value and tolerance inline, for example "revised FY revenue in the Summary tab should be 48.6 ± 0.2 USD million". Our pipeline parses those into structured checks with locators and comparison types. At the verifier density these tasks require, asking authors to hand-specify sheet references and comparison logic would add hours per task and produce inconsistent output, so the structuring belongs on our side. Verifiers that cannot be pinned to a value are classified as judgment checks, and that share is tracked, since it caps how much of the set supports RL.</p>
+
+<h4 id="t3-s26" data-nav="2.6 · Complexity bands vs measured difficulty">2.6 · Complexity bands and measured difficulty</h4>
+<p>Two different things are tracked here, and they serve different purposes. The <strong>complexity band</strong> is assigned up front, because it has to be knowable before anyone starts work. It is a specification of task shape, not a judgment:</p>
+<div class="tablewrap"><table>
+  <tr><th>Band</th><th>Objective and mixed tasks</th><th>Subjective tasks</th></tr>
+  <tr><td class="key num">B1</td><td>10 or more verifiers</td><td>2 input files</td></tr>
+  <tr><td class="key num">B2</td><td>30 or more verifiers</td><td>3 to 5 input files</td></tr>
+  <tr><td class="key num">B3</td><td>50 or more verifiers</td><td>More than 5 input files</td></tr>
+</table></div>
+<p>The queue assigns a band with the cell, so an author knows before starting what shape of task they are building, and the band is what slot rates in 7.2 are priced against. <strong>Measured difficulty</strong> is mean@5, computed after acceptance. Each sample is run five times through the probe model with tools enabled and deterministic decode settings, scored against its verifier set.</p>
+<p>The target distribution of measured difficulty depends on the model tier being trained, which is why I would not fix a cutoff now. Most of the signal for a frontier model sits where it currently fails or passes inconsistently; a smaller model learns nothing from a set it fails everywhere. I would report the measured distribution at the pilot readout and agree the target mix there.</p>
+<p>Two uses beyond metadata. A B3 sample the model passes almost every time goes to leak review, since a solution hint or a shortcut is the usual cause, and that mismatch between assigned band and measured difficulty is the signal worth watching. Distribution is reported per area, not only campaign-wide, so one area being accidentally easy is visible. Gold quality does not move with any of this. A wrong gold is useless for SFT and harmful for RL, so the correctness, tie-out and format gates apply identically at every difficulty level.</p>
+
+<h3 id="t3-s3" data-nav="3 · Developing the guidelines">3 · Developing the guidelines</h3>
+<p>This implements the division of labour in 1.1. Input is the V0 structure in section 2; output is the guidelines document in section 4.</p>
+<div class="flow">
+  <div class="flow-step"><div class="dot-col"><div class="dot">1</div><div class="line"></div></div><div class="fc"><div class="ft">Draft V0 mechanics</div><div class="fd">Sample schema, taxonomy, evaluation architecture, complexity bands, quality gates, review workflow. Gives the SME something concrete to correct rather than an open question, and gets the requester alignment.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">2</div><div class="line"></div></div><div class="fc"><div class="ft">Lead SME session</div><div class="fd">Work through V0 on what needs domain knowledge: which workflows deserve representation, what real inputs and outputs look like, where judgment allows several defensible answers, what a senior reviewer checks before sign-off. The question is where real Finance work produces useful capability tests, not which Finance questions are hardest.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">3</div><div class="line"></div></div><div class="fc"><div class="ft">V1 and seed samples</div><div class="fd">First complete draft plus seed samples spanning workflows and evaluation types, authored with the lead SME. Seeds become the practical interpretation of the guideline and carry more weight than the prose.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">4</div><div class="line"></div></div><div class="fc"><div class="ft">Observe a fresh SME</div><div class="fd">Give V1 to a qualified SME who did not help write it and watch them work. Track what they misunderstand, what they have to ask, where the schema creates waste, where they deviate, and stage timings. Surfaces problems that asking whether the guideline is clear does not.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">5</div><div class="line"></div></div><div class="fc"><div class="ft">Independent review</div><div class="fd">A different SME reviews those samples against the written guideline only. Each mismatch is classified as sample error, guideline ambiguity, domain ambiguity, or evaluation defect. The fix depends on the cause. I would not calibrate away genuine guideline ambiguity by telling reviewers which answer I wanted.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">6</div><div class="line"></div></div><div class="fc"><div class="ft">Revise and repeat</div><div class="fd">Ready to scale when a new SME can author without constant clarification, another can review from the same document, and timings are viable.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">7</div><div class="line"></div></div><div class="fc"><div class="ft">Requester checkpoint <span class="gate">Gate</span></div><div class="fd">First 30 accepted samples to the requester, spanning subdomains, evaluation types and measured difficulty, with explicit sign-off before volume is released. A correction at 30 samples costs 30 samples; the same correction in week three costs several hundred.</div></div></div>
+</div>
+<p>Steps 1–6 run in the first five working days; step 7 lands day six or seven. <strong>Providers are briefed only after V1 freezes.</strong> Appendix C has dates.</p>
+
+<h3 id="t3-s4" data-nav="4 · The annotation guidelines">4 · The annotation guidelines</h3>
+<p>The guidelines are a standalone deck, authored as annotators would receive it: <a href="https://docs.google.com/presentation/d/e/2PACX-1vThUPFTHxRUj4Gqivuiyirh3kwnNmSdt1ISUOvSGHaHFiOQTCDzsmJLVZx5Ow5BNBIgSUFbj_ksUnLK/pub?start=false&amp;loop=false&amp;delayms=60000&amp;slide=id.g3fafc6b9f96_2_2" target="_blank" rel="noopener">annotation guidelines (draft deck)</a>.</p>
+
+<h3 id="t3-s5" data-nav="5 · Workflow, infrastructure, review layers">5 · Workflow, infrastructure and review layers</h3>
+<h4 id="t3-s51" data-nav="5.1 · The order an author builds in">5.1 · The order an author builds in</h4>
+<p>Worth stating because it is not obvious and it moves both capacity dials. The intuitive order is prompt, then files, then solve, which is what produces input files whose totals do not foot, the most common rejection reason. The guidelines instruct the reverse:</p>
+<div class="flow">
+  <div class="flow-step"><div class="dot-col"><div class="dot">1</div><div class="line"></div></div><div class="fc"><div class="fd">Decide what the deliverable concludes and write the solution path down as a list of intermediate figures.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">2</div><div class="line"></div></div><div class="fc"><div class="fd">Count those intermediates against the assigned band. A band mismatch surfaces here, before anything is built, which is what makes the Gate 1 commitment safe.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">3</div><div class="line"></div></div><div class="fc"><div class="fd">Construct the input files backwards from the path, so totals foot by construction rather than by later correction.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">4</div><div class="line"></div></div><div class="fc"><div class="fd">Write the prompt last, when the requirements are known and can be stated without leaking method or file locations.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">5</div><div class="line"></div></div><div class="fc"><div class="fd">Produce the gold by solving the task from the files alone. Anything missing means the files are wrong, not the gold.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">6</div><div class="line"></div></div><div class="fc"><div class="fd">Confirm the proposed verifier candidates against the step 1 list.</div></div></div>
+</div>
+<p>Steps 1–4 are Gate 1, steps 5–6 are Gate 2. Permanent rejection and rework hours are the two inputs that drive headcount in the capacity model, and this sequence is the cheapest available reduction in both.</p>
+
+<h5>The submission pipeline, end to end</h5>
+<div class="flow">
+  <div class="flow-step"><div class="dot-col"><div class="dot">→</div><div class="line"></div></div><div class="fc"><div class="ft">Assigned taxonomy cell</div><div class="fd">Queue assigns cell + complexity band; nobody picks tasks.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">S1</div><div class="line"></div></div><div class="fc"><div class="ft">Stage 1: author submits prompt + input files only <span class="gate">Gate 1</span></div><div class="fd">Self-check in tool, then Gate 1 checks: tie-out, pinning, file integrity, leakage, dedup, contamination. Reviewer confirms the scenario is worth building, same day.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">S2</div><div class="line"></div></div><div class="fc"><div class="ft">Stage 2: author builds gold + confirms verifiers <span class="gate">Gate 2</span></div><div class="fd">Render checks, formula audit, verifier parse.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">QC</div><div class="line"></div></div><div class="fc"><div class="ft">Provider QC review</div><div class="fd">Guideline compliance, Finance correctness, verifier coverage of the solution path.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">AV</div><div class="line"></div></div><div class="fc"><div class="ft">Adversarial verifier check, run by us</div><div class="fd">Can the set be passed without doing the work?</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">M</div><div class="line"></div></div><div class="fc"><div class="ft">Model runs</div><div class="fd">mean@5, difficulty metadata assigned.</div></div></div>
+  <div class="flow-step"><div class="dot-col"><div class="dot">SME</div><div class="line"></div></div><div class="fc"><div class="ft">Lead SME sampling → accepted, versioned, locked</div><div class="fd">Checks on QC verdicts and direct QC of annotations, escalation, final acceptance.</div></div></div>
+</div>
+<p>Authoring is gated in two stages deliberately. A 7-hour package submitted as one blob means a tie-out error in an input file costs the full seven hours, and file-level defects are the most common rejection reason. Splitting the submission puts the cheap checks before the expensive work, which lowers both permanent rejection and rework hours, the two inputs that drive headcount in the capacity model. In-house final authority does not mean redoing the work. Once reviewer quality is calibrated, routine review is delegated while in-house keeps guideline and taxonomy decisions, calibration, disputed samples, high-risk workflows and acceptance policy.</p>
+
+<h4 id="t3-s52" data-nav="5.2 · What else needs building">5.2 · What else needs building</h4>
+<div class="tablewrap"><table>
+  <tr><th style="width:200px">Element</th><th>Purpose</th></tr>
+  <tr><td class="key">Annotation schema and UI</td><td>Two-stage submission, version IDs, review comments, rework states, acceptance. Metadata is derived from the submission wherever possible: authors enter workflow, persona and time spent, and nothing that can be computed.</td></tr>
+  <tr><td class="key">Author self-check</td><td>The Gate 1 and Gate 2 automated checks exposed as a button before submission, not only as a gate afterwards. Removes most rejection round trips.</td></tr>
+  <tr><td class="key">Automated check stack</td><td>Submission validation, verifier integrity, duplication and contamination screening, model-run harness. Appendix A.</td></tr>
+  <tr><td class="key">Verifier candidate extractor</td><td>Reads the submitted gold, surfaces every derived figure as a candidate verifier, and asks the author to confirm, discard or set a tolerance. Turns most of the verifier writing into review.</td></tr>
+  <tr><td class="key">Verifier execution harness</td><td>Runs structured verifiers against arbitrary model output. Needed for our own QC.</td></tr>
+  <tr><td class="key">Authorship linter</td><td>Automated LLM-authorship screening at submission, rather than an instruction to authors.</td></tr>
+  <tr><td class="key">Coverage dashboard</td><td>Cell fill rate against quota by subdomain, workflow, evaluation type.</td></tr>
+  <tr><td class="key">Versioning</td><td>Prompt, files, gold and verifiers locked as one package, with linked rework on any correction.</td></tr>
+  <tr><td class="key">Security and provenance</td><td>Data-source records, confidentiality policy, access control, authorship evidence.</td></tr>
+  <tr><td class="key">Campaign dashboard</td><td>Accepted and submitted volume, first-pass acceptance, rework, authoring and review time, error taxonomy by provider.</td></tr>
+</table></div>
+<h4 id="t3-s53" data-nav="5.3 · Review and audit layers">5.3 · The review and audit layers</h4>
+<p>Two tiers sit above authoring.</p>
+<div class="tablewrap"><table>
+  <tr><th>Tier</th><th>Who</th><th>Scope</th></tr>
+  <tr><td class="key">Provider QC</td><td>Annotators promoted into a QC role</td><td>100 percent of submissions, guideline compliance and Finance correctness</td></tr>
+  <tr><td class="key">Lead SMEs</td><td>Senior in-house Finance leads</td><td>A mix of sample checks on provider QC verdicts and direct QC of annotations, plus escalations, disputes and high-risk workflows</td></tr>
+</table></div>
+<p>Provider ratios are the provider's problem. What we fix is the outcome and the layers, since holding a provider to an acceptance rate rather than a headcount is what makes the arrangement enforceable.</p>
+<p>Provider QC is staffed by <strong>promotion rather than hiring</strong>, drawing on annotators whose tasking quality the lead SME has consistently seen. Production history is the entry exam, there is no separate calibration test. Sample checking a QC verdict costs 40 to 50 percent of a fresh audit, because the trail and verifier run already exist and the only question is whether the judgment was right, which is what lets <strong>two to three in-house domain leads</strong> cover the top tier instead of ten or more.</p>
+<p>Every new reviewer ramps supervised: their first two verdicts are fully re-checked by the lead SME, extendable at the lead's discretion. At production open, provider-nominated reviewers enter through the same supervised ramp directly, since nobody has production history with us on day one, and the promotion path takes over as production generates candidates. After the ramp, reviewer verdicts get random re-review on an ongoing slice, and the overturn rate is the control metric: a reviewer whose verdicts keep getting overturned goes back to annotation. QC is paid per task, same as authoring, and the overturn rule is what keeps per-task payment from rewarding rubber stamps.</p>
+<p>Sampling is risk-weighted rather than uniform, oversampling newly ramped reviewers, new providers and high-complexity samples. Every rate is a floor: findings that breach threshold on any source take sampling there to 100 percent until it recovers. Planted defects from the rejected-sample library are seeded into QC queues as the cheapest live check available, since they need no comparison reviewer. Reviewer selection and promotion criteria are Topic 5.</p>
+
+<h3 id="t3-s6" data-nav="6 · Feasibility of the timeline">6 · Feasibility of the requested timeline</h3>
+<p>Capacity is not one of the questions asked, so this section carries only what Section 7 needs to stand on, and what the requester needs to decide on the date. The arithmetic and its assumptions are in <a href="https://docs.google.com/spreadsheets/d/1TvIDVid0YI992wfucA999IKZ49jDv6KzoIsQEregpNg/edit?gid=1674402120#gid=1674402120" target="_blank" rel="noopener">capacity_cost_model.xlsx</a>, every input editable; Appendix B lists what I would re-baseline from the pilot.</p>
+<p>At 7 authoring hours per package on average, 9.2 hours all in, and 1,087 packages authored to land 1,000 accepted, the campaign is roughly <strong>10,600 expert hours</strong> across about eight production days, since guideline development, pilots and the requester checkpoint take the first four to six working days and final acceptance takes the last two to three. One rate chain holds everywhere in this document: 70 percent of submissions pass first time, 22 percent are recovered through rework, 8 percent are rejected permanently, which is 1,087 authored for 1,000 accepted and 92 percent acceptance once rework has run. Flat, the volume is an average of <strong>136 submissions a day</strong> and around <strong>240 concurrent qualified Finance SMEs at peak</strong>. Direct expert cost runs <strong>$0.9M to $1.34M</strong>, or $900 to $1,340 per accepted sample.</p>
+<div class="aside">
+  <span class="aside-label">The plan</span>
+  <p><strong>Commit to 1,000 in-window on a ramp, not a flat rate.</strong> The binding constraint is not sourcing bodies, Finance is a domain where providers hold warm credentialed pools at this size. The constraint is QC throughput while a new pool calibrates. So production is deliberately slow in the first two to three days, roughly 60 submissions a day under a high lead SME sampling rate with direct feedback, which is what calibrates the pool. The 60 is set by lead capacity, not provider capacity: two to three leads covering 15 to 20 checks a day is a 25 to 30 percent sampling rate, and that is the most the top tier can carry in the heavy feedback phase. As annotators prove out and are promoted into provider QC, review capacity grows and throughput scales with it, days 10 to 15 run at 170 to 190 submissions a day, which offsets the slow start and closes the 1,087 total. The campaign machinery is built for exactly this: the worked-example guidelines, the two-stage gates with same-day feedback, the author self-check and the automated stack all exist so that a large pool converges on one interpretation without a lead touching every task.</p>
+</div>
+<div class="aside">
+  <span class="aside-label">The honesty mechanism</span>
+  <p><strong>The day 9-10 status check is the honesty mechanism.</strong> By then the leads have run two to three days at a high sample rate and the one question that decides everything is measurable: is the QC pipeline growing on curve, enough promoted provider QCs to carry the back-loaded volume. If yes, continue. If not, there is no route to 1,000 in-window, and the requester gets that same day with the pre-computed fallback, about 275 accepted at held quality, rather than discovering it in delivery week. Quality is never the variable that silently absorbs the gap.</p>
+</div>
+<p>Authoring hours and first-pass acceptance are the two numbers that move everything else. The sensitivity table on the Headcount tab runs headcount from 144 to 339 SMEs as authoring hours move between 4 and 10, which is why the pilot instruments both rather than defending an estimate.</p>
+
+<h3 id="t3-s7" data-nav="7 · In-house vs external">7 · In-house vs external</h3>
+<h4 id="t3-s71">7.1 · How I would decide: per activity, not once for the campaign</h4>
+<div class="tablewrap"><table>
+  <tr><th>Criterion</th><th style="width:90px">Verdict</th><th>Why</th></tr>
+  <tr><td class="key">Qualified capacity at concurrency</td><td>External</td><td>Section 6 puts the need at up to ~240 credentialed Finance SMEs at peak. No in-house team stands that up at P0; warm pools are a provider's core competence.</td></tr>
+  <tr><td class="key">Speed to staffed</td><td>External</td><td>In-house hiring runs in weeks, provider mobilisation in days. With a fixed date this dominates.</td></tr>
+  <tr><td class="key">Control over the definition of quality</td><td>In-house</td><td>Taxonomy, guidelines, acceptance policy and calibration are the definition of quality. Outsourcing them outsources the benchmark.</td></tr>
+  <tr><td class="key">Confidentiality, IP, contamination</td><td>Split</td><td>Manageable by contract for production work; not acceptable for seed and calibration material, which is what a leak would most damage.</td></tr>
+  <tr><td class="key">Work future scope</td><td>External</td><td>Future scope and longevity of the workstream not confirmed hence in-house investment doesn't make sense.</td></tr>
+</table></div>
+<p>Capacity and speed point outward, control of quality points inward, so the split follows the line between <strong>defining quality and producing volume</strong>.</p>
+
+<h4 id="t3-s72" data-nav="7.2 · The resulting model">7.2 · The resulting model</h4>
+<p>In-house keeps the Finance taxonomy, realism criteria, seed tasks, guideline co-development, reviewer calibration, disputed and high-risk samples, and final domain authority. The program team keeps benchmark mechanics, schema, tooling, evaluation design, model runs, dashboards, allocation and acceptance policy. Providers supply production capacity for prompts, input files, gold deliverables, verifiers, and first-tier review once ramped. Volume splits across <strong>multiple calibrated providers rather than one</strong>, because a single source at this concurrency is a single point of failure on a fixed date, and reallocating toward stronger performers requires the other sources to already exist.</p>
+<p>Providers are paid per accepted sample at fixed band rates, and pay their own annotators on slot-based band-tiered rates as a stated requirement, since a deliberate difficulty distribution does not survive flat piece rates. Provider evaluation and contracting are Topic 4.</p>
+
+<h3 id="t3-s8" data-nav="8 · Provider underdelivery and risk">8 · Provider underdelivery and risk</h3>
+<p>A provider can deliver 1,000 submissions and still underdeliver. Similar dimensions as selection:</p>
+<div class="tablewrap"><table>
+  <tr><th style="width:110px">Risk</th><th>What it looks like</th><th>Control</th></tr>
+  <tr><td class="key">Domain depth</td><td>Finance-themed but unrealistic workflows, wrong terminology, weak gold deliverables.</td><td>In-house seed alignment set, supervised reviewer ramp before review counts, domain review, specialist routing for high-risk workflows.</td></tr>
+  <tr><td class="key">Capacity</td><td>High submissions, low accepted throughput, contributor drop-off, review bottleneck, late rework.</td><td>Weekly accepted-volume tracking, burn-down visible to both sides, other calibrated providers held warm to absorb reallocation.</td></tr>
+  <tr><td class="key">Quality</td><td>LLM-ghostwritten samples, template reuse, verifier sets that pass defective outputs, broken artifacts.</td><td>Automated gates catch the first three mechanically: authorship screening, structural dedup, adversarial verifier check. The audit layers in 5.3 catch the rest.</td></tr>
+  <tr><td class="key">Price</td><td>Low quoted rate offset by internal review, rework and rejection.</td><td>Compare effective cost per accepted sample against a bottom-up floor. A bid materially below it is a quality warning, since the margin comes out of SME seniority or review depth.</td></tr>
+  <tr><td class="key">Security &amp; integrity</td><td>Confidential data, poor provenance, fabricated credentials, resale, silent subcontracting.</td><td>Access control, provenance evidence, audit rights, author and reviewer separation, explicit data and LLM policy.</td></tr>
+</table></div>
+
+
+<h3 id="t3-appendices" data-nav="Appendices A–C">Appendices</h3>
+<details class="fold" id="t3-appA">
+  <summary>Appendix A · Automated check stack <span class="note">every check exists because of a failure I expect</span></summary>
+  <div class="fold-body">
+    <p>Expert review hours are the scarcest resource, so anything a machine can catch should not reach a reviewer. The stages map to the two authoring gates in section 5, then to review and post-acceptance.</p>
+    <h5>Gate 1, on prompt and input files (runs before the author builds the gold; exposed as a self-check)</h5>
+    <div class="tablewrap"><table>
+      <tr><th>Failure mode</th><th>Check</th></tr>
+      <tr><td>Incomplete submission</td><td>Schema validation on the fields the author actually enters.</td></tr>
+      <tr><td>Files that do not open, corrupt workbooks, wrong extension</td><td>Integrity and open test on every input file.</td></tr>
+      <tr><td>Input file totals that do not foot, or figures contradicting across files</td><td>Cross-file tie-out.</td></tr>
+      <tr><td>Unpinned time-sensitive values</td><td>Scan for temporal references and a missing as-of date.</td></tr>
+      <tr><td>Prompt leaking the answer, method or threshold</td><td>Leakage scan against the input files.</td></tr>
+      <tr><td>Scenario duplicating an existing sample's structure</td><td>Structural signature check against the accepted pool.</td></tr>
+    </table></div>
+    <h5>Gate 2, on gold and verifiers (also a self-check)</h5>
+    <div class="tablewrap"><table>
+      <tr><th>Failure mode</th><th>Check</th></tr>
+      <tr><td>Gold visually broken: cut-off text, blank slides, unreadable contrast</td><td>Render every page to image and run layout checks. GDPVal reports this removed black-square artifacts entirely and cut severe PowerPoint formatting errors from 86% to 64%.</td></tr>
+      <tr><td>Hard-coded values where formulas were required</td><td>Formula-density audit on cells that should be derived.</td></tr>
+      <tr><td>Figures in the gold that trace to nothing in the inputs</td><td>Cross-file tie-out on every material figure.</td></tr>
+      <tr><td>Numeric verifier without a tolerance, or a sentence the parser cannot resolve</td><td>Verifier parse and validation, unparsed lines returned to the author.</td></tr>
+      <tr><td>Verifier set concentrated on the final answer</td><td>Solution-path coverage computed from the parsed set.</td></tr>
+    </table></div>
+    <h5>Flagged for human judgment, either gate</h5>
+    <div class="tablewrap"><table>
+      <tr><th>Failure mode</th><th>Check</th></tr>
+      <tr><td>Coverage drifting from the quota plan</td><td>Cell fill rate by area and workflow reported daily. Enforcement is at assignment, so this is a monitoring signal on whether the queue is keeping up, not a per-sample flag.</td></tr>
+      <tr><td>Task adapted from a public benchmark or textbook</td><td>N-gram and embedding search against public finance benchmark sets and problem corpora.</td></tr>
+      <tr><td>Model answers without the files, indicating memorised material</td><td>Memorisation probe: run the prompt with input files withheld.</td></tr>
+      <tr><td>Sample authored by an LLM</td><td>Authorship screening, escalating to a live walkthrough.</td></tr>
+      <tr><td>Decorative tool use</td><td>Ablation: remove the tool or file and check whether completion degrades.</td></tr>
+    </table></div>
+    <h5>Verifier integrity, after Gate 2</h5>
+    <div class="tablewrap"><table>
+      <tr><th>Failure mode</th><th>Check</th></tr>
+      <tr><td>Verifier inconsistent with its own gold</td><td>Run the full set against the gold. Must pass at 100% by definition.</td></tr>
+      <tr><td>Verifier passable without doing the work</td><td>Corrupted-output suite from 2.5. Every defective variant must fail.</td></tr>
+      <tr><td>Verifier keyed to phrasing rather than fact</td><td>Representation variants of the gold must still pass.</td></tr>
+      <tr><td>Non-atomic verifier</td><td>Flag compound conditions for splitting.</td></tr>
+    </table></div>
+    <p><strong>Post-acceptance diagnostics:</strong> mean@5 runs assign difficulty metadata; complexity-vs-difficulty mismatches go to leak review; difficulty distribution reported per area; acceptance rate, rework rate and error-taxonomy mix tracked per provider and per batch, with a sustained drop on any source triggering review of that source.</p>
+    <p><strong>Build order:</strong> Gate 1 and the author self-check must exist before the first provider batch, since together they remove the largest volume of avoidable rework. The verifier integrity checks gate whether the objective portion is usable for RL.</p>
+  </div>
+</details>
+
+<details class="fold" id="t3-appB">
+  <summary>Appendix B · Capacity model <span class="note">inputs, and what gets re-baselined at pilot</span></summary>
+  <div class="fold-body">
+    <p>The model is attached as <a href="https://docs.google.com/spreadsheets/d/1TvIDVid0YI992wfucA999IKZ49jDv6KzoIsQEregpNg/edit?gid=1674402120#gid=1674402120" target="_blank" rel="noopener">capacity_cost_model.xlsx</a>. Four tabs: Assumptions (editable inputs), Effort (per package and campaign totals), Headcount (three delivery scenarios plus a sensitivity table on authoring hours), Cost (rates to a blended rate and campaign cost).</p>
+    <div class="tablewrap"><table>
+      <tr><th>Input</th><th>Value</th></tr>
+      <tr><td>Authoring hours per package</td><td class="num">7, average across the set</td></tr>
+      <tr><td>Verification as share of authoring</td><td class="num">25%</td></tr>
+      <tr><td>QC audit sampling rate</td><td class="num">25% of accepted</td></tr>
+      <tr><td>In-house re-review, share of QC verdicts and share of a full audit</td><td class="num">22% / 45%</td></tr>
+      <tr><td>Permanent rejection / rework rate / rework hours</td><td class="num">8% / 22% / 2.5 hrs</td></tr>
+      <tr><td>Production days in a 3-week window</td><td class="num">8</td></tr>
+      <tr><td>Productive hours per SME per day</td><td class="num">5.5</td></tr>
+      <tr><td>Rates by tier</td><td class="num">$60–150 / hr</td></tr>
+    </table></div>
+    <p>Authoring is deliberately one number rather than a stage breakdown, since a breakdown implies a precision we do not have before the pilot and invites debate about the split rather than the total.</p>
+    <p>What I would instrument in the pilot and re-baseline before the ramp: median and P90 authoring time, median review time, rework time and reason, first-pass acceptance, and permanent rejection. I would measure Gate 1 separately, since its whole purpose is to move permanent rejection and rework hours down, and if it does not do that it is not worth the extra round trip.</p>
+  </div>
+</details>
+
+<details class="fold" id="t3-appC">
+  <summary>Appendix C · Working plan and dependencies <span class="note">day-by-day, cross-team asks, internal risks</span></summary>
+  <div class="fold-body">
+    <p>Shaped around the ramp commitment in section 6. Providers receive nothing before the guideline is frozen, so their pilots sit after day 5 rather than running in parallel with guideline development.</p>
+    <div class="tablewrap"><table>
+      <tr><th style="width:70px">Days</th><th>Activity</th><th>Gate</th></tr>
+      <tr><td class="num">1–2</td><td>Requester clarifications closed. Taxonomy and V0 drafted. Lead SME session. Gate 1 checks in build. Provider shortlist agreed but not briefed.</td><td>Downstream use and target model tier confirmed.</td></tr>
+      <tr><td class="num">3–5</td><td>Seed samples with lead SMEs. Guideline V1 drafted. Fresh-SME creation and independent review cycle.</td><td><strong>Guideline V1 frozen.</strong></td></tr>
+      <tr><td class="num">6–7</td><td>Providers briefed and pilots run against the frozen guideline. Provider reviewers enter the supervised ramp. First 30 accepted samples authored in-house across areas and evaluation types.</td><td><strong>Requester sign-off on the first 30.</strong> Providers scored and allocated.</td></tr>
+      <tr><td class="num">8–10</td><td>Production opens slow, ~60 submissions a day under high lead SME sampling with direct feedback. Annotators promoted into provider QC as they prove out. Rolling acceptance from day 8.</td><td><strong>Day 9-10 requester status check: QC pipeline growing on curve, or the 1,000 call is made now with the ~275 fallback.</strong></td></tr>
+      <tr><td class="num">10–15</td><td>Throughput scales with the QC bench, 170 to 190 submissions a day. Coverage, duplication and difficulty diagnostics daily. Allocation shifted toward stronger providers.</td><td>Rolling 3-day acceptance holds above the 85 percent floor.</td></tr>
+      <tr><td class="num">14–15</td><td>Final QC on the tail alongside continuing production. Rework on flagged samples. Set locked and handed over with its coverage and difficulty report.</td><td>1,000 accepted and locked.</td></tr>
+    </table></div>
+    <p>The first 30 come from the in-house anchor pod rather than a provider, which is what makes the day 6–7 sign-off possible at all. Acceptance runs rolling from day 8 so the window is not blocked by a single QC pass at the end. Two hard dependencies: the day 6–7 requester sign-off, and Gate 1 checks ready before day 8. A slip on either compresses production day for day.</p>
+    <h5>What I need from other teams, raised in week zero with named owners</h5>
+    <div class="tablewrap"><table>
+      <tr><th>From</th><th>What I need</th><th style="width:90px">By</th><th>If late</th></tr>
+      <tr><td class="key">Requester</td><td>Downstream use and target model tier. Named reviewer for the day 6–7 sign-off and the day 9-10 status check.</td><td class="num">Day 2, day 6</td><td>Difficulty target unset; volume cannot be released on schedule.</td></tr>
+      <tr><td class="key">Research / ML</td><td>Probe model access and inference budget for mean@5. Client base model access for benchmarking, if it exists.</td><td class="num">Day 5</td><td>Difficulty metadata unmeasured; mislabelled samples reach delivery.</td></tr>
+      <tr><td class="key">Engineering</td><td>Annotation schema and UI, Gate 1 checks, verifier execution harness, coverage dashboard.</td><td class="num">Gate 1 day 7, harness day 10</td><td>Review load lands on expert reviewers, the most expensive possible substitution.</td></tr>
+      <tr><td class="key">Legal / procurement</td><td>Provider agreements and NDAs, so briefing can start the moment the guideline freezes.</td><td class="num">Day 5</td><td>Provider pilots slip past day 7; production starts late.</td></tr>
+      <tr><td class="key">Recruiting / provider mgmt</td><td>SME sourcing and credential verification for the anchor pod and provider rosters.</td><td class="num">Anchor day 1, rosters day 6</td><td>Pilot and calibration set slip, delaying everything downstream.</td></tr>
+      <tr><td class="key">Finance</td><td>Approval against the full-volume cost envelope, with the ~275 fallback costed alongside.</td><td class="num">Day 3</td><td>Allocation cannot be committed.</td></tr>
+    </table></div>
+    <p><strong>Cadence:</strong> daily during production to the program team and provider leads on accepted counts, acceptance rate and blocked samples. Twice weekly to the requester on volume against plan, coverage, duplication flags, difficulty distribution and open decisions. Gate-based sign-offs at V1 freeze, the first 30, the day 9-10 status check, and final acceptance.</p>
+    <h5>Internal risks</h5>
+    <div class="tablewrap"><table>
+      <tr><th style="width:46%">Risk</th><th>Control</th></tr>
+      <tr><td>Guideline churn after production starts, invalidating completed samples</td><td>Freeze V1 at the day-5 gate, version every change after it, batch post-freeze changes, apply linked rework so corrections propagate to dependent files, gold and verifiers.</td></tr>
+      <tr><td>Requester unavailable for the day 6–7 sign-off</td><td>Name the reviewer and book the slot in week zero. If they cannot commit, escalate the go/no-go rather than releasing volume unsigned.</td></tr>
+      <tr><td>Tooling late, so automated checks fall to reviewers</td><td>Sequence Gate 1 first, hold a manual fallback checklist, accept a lower ramp rate rather than skipping checks.</td></tr>
+      <tr><td>Anchor SME churn removing domain authority mid-campaign</td><td>Two to three anchors per area, with the seed set and rejected-sample library as the durable record of their judgment so authority is transferable.</td></tr>
+      <tr><td>Reviewer drift as volume ramps</td><td>Random re-review on an ongoing slice with overturn tracking, blind 10 percent double review, demotion to annotation on sustained overturns.</td></tr>
+      <tr><td>Floors met but everything passes the probe model easily</td><td>Report the distribution at the pilot readout and adjust the target mix, rather than pushing authors toward artificial difficulty.</td></tr>
+      <tr><td>Volume delivered, dataset not usable downstream</td><td>The 30-sample sign-off and twice-weekly coverage and difficulty reporting exist for this.</td></tr>
+    </table></div>
+  </div>
+</details>
+</section>
+
+<hr class="topic-rule">
+<section class="topic" id="t4" data-num="Topic 4" data-title="Sourcing" data-mins="7" data-desc="Vendor funnel, bid evaluation, contract teeth">
+<div class="topic-head">
+  <div class="eyebrow">Topic 4 · ~7 min</div>
+  <h2 class="topic-title">Sourcing</h2>
+  <p class="brief">Topic 3 fixed the split: in-house owns the guideline spec, seed alignment set, acceptance rubric and final QC; external providers own volume. Topic 4 selects those providers and writes the contract so each of Topic 3's five underdelivery axes has a clause with a number and a consequence.</p>
+</div>
+
+<div class="decision">
+  <div class="tag"><span class="l">Decision</span><span class="r">Sourcing model</span></div>
+  <div class="body">
+    <p class="call">RFI → RFP → Round 1 evaluation (input metrics only) → paid pilot for passing vendors → Round 2 evaluation (pilot performance) → qualified vendor pool → contract.</p>
+    <p class="why">Security knockouts first at RFI: fail any, exit the funnel. Each capability question is cheap to answer truthfully and expensive to fake. Negotiation happens against the cost floor, never against other bids, and a bid materially below the floor is a quality warning, since the margin comes out of SME seniority or review depth.</p>
+  </div>
+  <div class="decision-grid">
+    <div>Timeline fit</div><div>On Topic 3's Appendix C calendar: RFI out days 1 to 2, RFP samples due day 4, Round 1 on day 5, pilots run days 6 to 7 against the frozen guideline, allocation and contracts close day 7, production opens day 8.</div>
+    <div>Quality floor</div><div>One common quality floor applies to every vendor, 85% first pass acceptance, since performance differences are already absorbed by band allocation.</div>
+    <div>Contract logic</div><div>Each clause set is the tooth for one Topic 3 underdelivery axis.</div>
+  </div>
+</div>
+
+<h3 id="t4-s1" data-nav="1 · Discovery and solicitation">1 · Discovery and solicitation</h3>
+<p><strong>Channels, in order of signal:</strong> backchannel references from procurement peers at other labs ("they nailed every milestone with us" is the highest signal available); acknowledgment sections of published benchmarks; researcher network, then directories and inbound. Supply tiers: full-service data companies, specialist finance expert networks, managed marketplaces.</p>
+<h5>RFI: security knockouts first, then capability</h5>
+<p>Security knockouts first: SOC2, GDPR, data residency, access controls. Fail any, exit the funnel. Then the capability questionnaire, each question cheap to answer truthfully and expensive to fake:</p>
+<ol>
+  <li>Anonymized SME roster with credentials, and consent to interview two of our choosing.</li>
+  <li>Last comparable project: first-pass acceptance rate and top 3 rejection reasons.</li>
+  <li>How they ensure their raters produce high-quality verdicts during evaluation, and how that is measured.</li>
+  <li>Ramp plan: cohort sizes per week and reviewer-to-annotator ratio.</li>
+  <li>Qualified pool attrition over the last two quarters.</li>
+  <li>Rework turnaround actually held on the last project.</li>
+  <li>Subcontracting: whether, to whom, and disclosure terms.</li>
+  <li>Two references with comparable scope and contact consent.</li>
+</ol>
+<p><strong>RFP, forked by task nature.</strong> Standard task (this campaign): one page spec, samples due in 2 days. Round 1 evaluates the samples received. Custom task: no inventory exists to sample, so Round 1 evaluates inputs, expert headcount at the required bar (e.g. 5+ years auditing), credential verification, deployment time, per hour cost against budget.</p>
+
+<h3 id="t4-s2" data-nav="2 · Bid evaluation">2 · Bid evaluation</h3>
+<h4 id="t4-s21">2.1 · Round 1: input metrics</h4>
+<p>Round 1 is not an absolute score: it qualifies vendors and shapes how the campaign is allocated across them.</p>
+<div class="tablewrap"><table>
+  <tr><th>Lever</th><th>What it decides</th></tr>
+  <tr><td class="key">Sample quality (standard) or expert bench (custom)</td><td>Which complexity bands the vendor is eligible for</td></tr>
+  <tr><td class="key">Capacity and ramp plan</td><td>How much volume share they can carry</td></tr>
+  <tr><td class="key">Price vs cost floor</td><td>Where they sit in the band routing</td></tr>
+  <tr><td class="key">References</td><td>Risk flag and tiebreak</td></tr>
+</table></div>
+<p>Allocation follows the lever readout: a vendor with excellent sample quality but limited capacity or high price gets the harder band, which carries less volume; bulk volume routes to vendors with acceptable quality at lower price. The design target is <strong>the best expected output from the qualified pool as a whole</strong>, not a ranking of vendors against each other.</p>
+<p>Cost floor is built bottom up before reading any bid, from the stage times in the Topic 3 capacity model: authoring hours plus QC and rework hours per band, times loaded rates, plus platform and margin. Blended, the model puts direct expert cost at $900 to 1,340 per accepted sample, compressible with global supply. The floor is a budgeting reference, not a quality signal, with global pools we cannot police who does the work, so quality is enforced by the measurement system rather than inferred from price. For pre-built inventory, one added check: run the Topic 3 probe models on their set, and a set the strong probe clears at a high rate is too easy and is rejected, against the difficulty target agreed at the pilot readout.</p>
+
+<h4 id="t4-s22" data-nav="2.2 · Round 2: paid pilot">2.2 · Round 2: paid pilot</h4>
+<p>Vendors passing Round 1 run an identical paid pilot: 5 tasks under the Topic 3 guidelines, graded blind by the in-house leads, same reviewers across all vendors.</p>
+<div class="tablewrap"><table>
+  <tr><th>Criterion</th><th style="width:80px">Weight</th><th>Threshold</th></tr>
+  <tr><td class="key">First-pass acceptance rate</td><td class="num">45%</td><td>≥ 85%</td></tr>
+  <tr><td class="key">Rejection reason distribution</td><td class="num">20%</td><td>No single failure mode &gt; 40% of rejections</td></tr>
+  <tr><td class="key">Rework turnaround</td><td class="num">15%</td><td>≤ 24 hrs</td></tr>
+  <tr><td class="key">Communication and guideline engagement</td><td class="num">20%</td><td>Clarifying questions raised before authoring</td></tr>
+</table></div>
+<p>Weights are directional, they show which factor carries more weightage in the decision, not a calculation formula. One common quality floor applies to every vendor, 85% first pass acceptance, since performance differences are already absorbed by band allocation. Accepted pilot samples count toward delivery volume and are paid at band rates.</p>
+
+<h3 id="t4-s3" data-nav="3 · Rate negotiation">3 · Rate negotiation</h3>
+<p>Negotiation happens after Round 2 and before contract, against the cost floor from 2.1, never against other bids. Rates are negotiated per band (B1/B2/B3), and the band mix is the lever, not the blended number. The allocation principle is output to input ratio, better annotators at better rates on tougher bands. Rates are checked against the stage time cost model for realism, quality is enforced by the measurement system, not by price. Volume tiers and share rebalancing are the remaining levers, volume share across vendors is rebalanced by acceptance rate so every vendor prices knowing share is earnable. The negotiated band rates then enter the contract as fixed prices.</p>
+
+<h3 id="t4-s4" data-nav="4 · The contract">4 · The contract: a tooth per underdelivery axis</h3>
+<div class="tablewrap"><table>
+  <tr><th style="width:150px">Clause set</th><th>Terms</th></tr>
+  <tr><td class="key">4.1 Acceptance &amp; payment</td><td>Acceptance criteria enter the SOW verbatim from the guidelines: gates, verifier bands, band minimums. <strong>Payment is per accepted task.</strong> The vendor raises a monthly purchase order quoting the tasks accepted in the period, we verify the count against the acceptance record, and payment releases on verification. The cycle is vendor initiated, not ops triggered. Prices are fixed per complexity band (B1/B2/B3), no blended rate. The provider pays its own annotators on the same structure, slot based with band tiered rates per Topic 3 section 7.2, stated as a contract requirement because a deliberate difficulty distribution does not survive flat piece rates. Milestones: pilot, ramp, scale per the committed curve.</td></tr>
+  <tr><td class="key">4.2 Domain depth</td><td>Named SME roster with credentials in the SOW, audit rights on qualifications, interview rights on annotators of our choosing. Subcontracting requires written disclosure and approval. The provider runs first tier review on 100 percent of submissions, and its reviewers enter through the supervised ramp, first two verdicts fully re-checked by our lead SME before their review counts.</td></tr>
+  <tr><td class="key">4.3 Capacity</td><td>Ramp curve commitments per vendor, slow start under heavy sampling then scaling to their share of the 170 to 190 submissions a day the back-loaded plan needs, with accepted-volume SLAs set against that curve rather than a flat weekly number. Multi-vendor pool; peak concurrency ~240 Finance SMEs and no single vendor carries that alone. Floater freelance capacity activated on request for surges. Every qualified vendor runs a minimum live volume that keeps them ramped, which is what makes reallocation executable inside the window. Contracts are bilateral, a vendor sees only their own scope, volume and terms, never who else is in the pool or how many.</td></tr>
+  <tr><td class="key">4.4 Quality</td><td>Daily delivery batches with same-day vendor QC. The floor is measured on each vendor's <strong>rolling 3-day acceptance rate</strong>, not on single daily batches, so the floor is statistically stable at ramp volumes while the daily cadence stays. Breach mechanics on a rolling 5-day window, same for quality and throughput: first breach → corrective plan within 24 hrs; second → volume reduced and redirected to non-breaching vendors; third in window → task flow stops. Disputes: quality computed on a defined random sample, every rejection keyed to the guideline clause violated; vendor has 24 hrs to contest; contested samples get a blind re-score by a second reviewer. Audit sampling is random throughout, elevated at the annotator level early and decaying to the standard rate once the vendor clears the floor. Our own overturn rate is tracked, repeated flips at re-score mean the rubric or reviewers are the problem.</td></tr>
+  <tr><td class="key">4.5 Security &amp; integrity</td><td>Full IP assignment including training rights, exclusivity against resale, no-reuse clause with liquidated damages. For pre-built inventory: written warranty of no prior sale with liquidated damages, plus our similarity check against public sets. Non-contamination and duplication clauses carry over verbatim from the guidelines. Provenance requirements on gold deliverables. Data security schedule per the RFI knockouts.</td></tr>
+</table></div>
+
+<h3 id="t4-s5" data-nav="5 · What we build on our side">5 · What we build on our side</h3>
+<p>Review runs on the two tier architecture from Topic 3 section 5.3: vendor QC covers 100 percent of submissions same day, and 2 to 3 lead SMEs sit on top with a mix of sample checks on QC verdicts and direct QC of annotations, sampling heavy in the first two to three days and decaying as the vendor QC bench grows through promotion. The automated gate stack covers the objective layer before any human touches a sample. QC bench growth is the number the day 9-10 requester status check reads, because it decides whether the back-loaded 1,000 is reachable.</p>
+<p><strong>Posture, carried from Topic 3:</strong> pay per accepted sample, gate every batch, keep other calibrated sources warm, and hold payment until the audit clears.</p>
+</section>
+
+<hr class="topic-rule">
+<section class="topic" id="t5" data-num="Topic 5" data-title="Management" data-mins="8" data-desc="Recruiting funnel, quality system, team tracking">
+<div class="topic-head">
+  <div class="eyebrow">Topic 5 · ~8 min</div>
+  <h2 class="topic-title">Management</h2>
+  <p class="brief">Scope: the end to end contractor system, recruit domain specific expert annotators, qualify them, guarantee quality, and manage teams across subdomains through contract end. The framework is domain agnostic and is instantiated per domain through a domain advisor, the machinery stays constant and only the advisor archetype and the screening instrument change with the domain.</p>
+</div>
+
+<div class="decision">
+  <div class="tag"><span class="l">Decision</span><span class="r">Contractor system</span></div>
+  <div class="body">
+    <p class="call">The first hire in any new domain is not an annotator, it is one senior practitioner as domain advisor. Interviews measure domain depth but production needs all three axes, so the decisive funnel instrument is a paid work sample, not a conversation.</p>
+    <p class="why">Annotator quality has no direct gauge, the only observable is the tasks they submit, so the quality system is a pipeline that converts task level verdicts into per annotator signals, and per annotator signals into staffing decisions. The funnel scales by promoting annotators qualified from early cohorts into screening and grading.</p>
+  </div>
+  <div class="decision-grid">
+    <div>Funnel economics</div><div>Total ~$16k for 15 qualified per 100 invited, so ~$1.1k per qualified annotator at US rates and roughly $450 to 650 with Indian or global supply. Net conversion is 15% of invited; time to qualified per candidate is under a week.</div>
+    <div>Retention design</div><div>A qualified expert given no work for two weeks is already on the way out, so every qualified annotator carries a minimum live volume that keeps them ramped and retained. At T minus 4 weeks before any contract end, the platform raises the decision automatically.</div>
+  </div>
+</div>
+
+<h3 id="t5-s1" data-nav="1 · The domain advisor">1 · The domain advisor</h3>
+<p>The first hire in any new domain is not an annotator. It is one senior practitioner on a fractional per hour basis, 10 to 12+ years in industry for Finance, an assistant professor or active researcher for Physics, Maths or Biology, whose job is to close my knowledge gap about the industry before I hire into it:</p>
+<ol>
+  <li>Map the subdomains, what each one does day to day, and what a real task and deliverable look like in each.</li>
+  <li>The data structures and file types practitioners actually work in.</li>
+  <li>Market rates by seniority, so offers and the cost floor are grounded.</li>
+  <li>Then, working with me, source the first candidates, help build the assessment items, and sit the domain interviews.</li>
+</ol>
+<p><strong>Validating the validator</strong>, since I do not have the expertise to evaluate this expert directly: backchannel references over self reported credentials, cross checking their subdomain map against public structures (GICS and standard corporate finance function maps for Finance, curriculum and arXiv taxonomies for academic domains), and where budget allows, two advisors briefly in parallel so their maps can disagree. One disclosure rule: the advisor sources from their own network, which is useful and declared, and their referrals run the same funnel with no shortcuts.</p>
+
+<h3 id="t5-s2" data-nav="2 · The skill profile">2 · The skill profile: three axes</h3>
+<ol>
+  <li><strong>Domain depth.</strong> Has actually done the work the tasks describe. The realism test from the guidelines applies to the annotator before it applies to the task: if they cannot name the meeting a deliverable would be presented in, they cannot author it.</li>
+  <li><strong>Authoring precision.</strong> Can translate expertise into a specified task, prompt, input files, gold and verifiers, under a guideline. This is a separate skill from domain depth, and it is where most expert hires fail.</li>
+  <li><strong>Coachability.</strong> Absorbs structured feedback and converges on the guideline instead of relitigating it.</li>
+</ol>
+<p>The design consequence: interviews measure axis 1 but production needs all three, so the decisive funnel instrument is a paid work sample, not a conversation.</p>
+
+<h3 id="t5-s3" data-nav="3 · Candidate evaluation funnel">3 · Candidate evaluation funnel, worked per 100 invited</h3>
+<div class="tablewrap"><table>
+  <tr><th>Stage</th><th>Instrument</th><th style="width:105px">Measures</th><th style="width:95px">Volume</th><th>Cost driver</th></tr>
+  <tr><td class="key">1 · Sourcing</td><td>Advisor network, professional bodies, expert networks, platforms</td><td></td><td class="num"></td><td></td></tr>
+  <tr><td class="key">2 · Resume shortlist</td><td>Credential knockout against the subdomain map</td><td>Axis 1, cheaply</td><td class="num">100 → ~60 appear</td><td>Minutes per resume</td></tr>
+  <tr><td class="key">3 · Domain screen</td><td>Objective domains: novel internal problem set, never published. Judgment domains: 30–45 min defense-of-past-work interview with the lead SME or advisor</td><td>Axis 1, properly</td><td class="num">60 → 30</td><td>0.5 hr paid lead-SME time per interview</td></tr>
+  <tr><td class="key">4 · Task-based training</td><td>Guideline walkthrough with worked examples, including a rejected-and-rectified pair</td><td></td><td class="num">30 → 30</td><td>~2 hrs, unpaid self-serve</td></tr>
+  <tr><td class="key">5 · Paid work sample, two rounds</td><td>Author one scoped ~2 hr task under the guideline, full package shape at reduced size, so completion does not filter on availability instead of skill. Graded on the production acceptance rubric, structured feedback, then a revision round</td><td>Axes 2 and 3</td><td class="num">30 → 15</td><td>~2 hrs authoring + ~1 hr revision at band rate, plus grading</td></tr>
+  <tr><td class="key">6 · Supervised ramp</td><td>First tasks in production 100% reviewed</td><td>Axis 3 in production</td><td class="num">15 qualified</td><td>Review time</td></tr>
+</table></div>
+<p>The 60% show rate is an over invite instruction, not a problem, the shortlist is sized at ~1.7x the interview slots to be filled. Two green signals at stage 5 and both are accepted: a strong first submission, or a first submission with defects followed by a revision that clearly absorbs the feedback. The second is not a consolation pass because it directly measures the axis that predicts production behavior. The red signal is the same defects surviving the feedback round.</p>
+<p>The work sample is <strong>paid at band rate</strong> because an unpaid assessment funnel for senior experts selects for the underemployed. It is deliberately scoped to ~2 hours rather than a full production task, and that is a named trade off: the decisive instrument for authoring ability is shortened, trading assessment depth for candidate retention, because a 7 hour assessment loses strong candidates to drop off before it loses weak ones to failure. The residual risk, someone who passes a scoped sample but cannot sustain quality on a full package, is paid for downstream in review capacity, and the supervised ramp reviews first production tasks at 100% precisely to catch it.</p>
+<p><strong>Funnel economics, built bottom up per 100 invited</strong> at a $100/hr annotator mid rate and $150/hr lead SME rate: interviews 60 x 0.5 hr of paid lead SME time ($4.5k), work sample round 1 30 x 2 hrs ($6k) plus grading 30 x 0.5 hr of SME time ($2.25k), revision round ~20 x 1 hr ($2k) plus re-score ($1.5k). Total ~$16k for 15 qualified, so ~$1.1k per qualified annotator at US rates and roughly $450 to 650 with Indian or global supply. Net conversion is 15% of invited, and time to qualified per candidate is under a week, which assumes same day grading turnaround and is one more reason the evaluator bench in 3.1 has to exist. The funnel still never fully stops while campaigns run, because what varies is demand, not qualification speed.</p>
+<h4 id="t5-s31" data-nav="3.1 · Scaling the funnel past the lead SME">3.1 · Scaling the funnel past the lead SME</h4>
+<p>The lead SME grades the first cohort's work samples and runs the first interviews, and both roles are then handed down. Annotators qualified from early cohorts are promoted into screening and grading for subsequent cohorts, entering through the same supervised ramp, their first verdicts and interview calls fully re-checked by the lead SME before they count, with lead SME sampling continuing at a decaying rate. Without this the funnel caps at a few dozen hires, since at 15% conversion a 240 expert pool implies ~1,600 invites and ~960 interviews, which is ~480 hours of screening that no single lead SME can absorb.</p>
+<div class="aside">
+  <span class="aside-label">Framing note · The funnel's clock</span>
+  <p>One framing note on time: this funnel is the standing machinery for building and maintaining a pool, and it runs on its own clock, not a campaign's. Per candidate the cycle is under a week, but a pool at scale qualifies in cohort waves, because early cohorts have to be promoted into screening and grading before later cohorts can run, so a large expert pool still cannot be stood up inside a 2 to 3 week delivery window. Volume inside such a window is served by an already warm pool or calibrated external providers, while this funnel runs continuously underneath, fed by the projected lapse signal in 5.4.</p>
+</div>
+
+<h3 id="t5-s4" data-nav="4 · Guaranteeing quality">4 · Guaranteeing quality</h3>
+<p>The quality being guaranteed here is annotator quality. But annotator quality has no direct gauge, the only observable is the tasks they submit, so the system below is a pipeline that converts task level verdicts into per annotator signals, and per annotator signals into staffing decisions.</p>
+<h5>The measurement instruments, in order of cost</h5>
+<ol>
+  <li><strong>Automated gate stack first.</strong> Schema, totals footing, as-of-date pinning, verifier set passing its own gold. No human touches a sample that fails these.</li>
+  <li><strong>Reviewer QC on 100% of submissions</strong>, graded against the acceptance rubric with every rejection keyed to the guideline clause violated.</li>
+  <li><strong>Lead SME sampled review on top.</strong> Selected lead SMEs, plus annotators promoted into review through the ramp, re-check a sample of submissions directly and a sample of reviewer verdicts, heavy on each annotator's and each new reviewer's first production work and decaying with track record, and always applied to samples destined for gold or calibration use. This is the layer that catches a reviewer bench drifting, not just an annotator slipping.</li>
+</ol>
+<p>These are authored task packages, not labels, so agreement metrics do not transfer directly, three people never independently produce the same package and forced convergence measures nothing. <strong>Disagreement is a two branch signal:</strong> on objective components, reviewer and author disagreeing means the guideline or the files are ambiguous, so the fix is a spec patch, not a verdict vote. On subjective deliverables, disagreement can be legitimate professional judgment, and it is protected by grading justification quality rather than forcing convergence. The reviewers are themselves instrumented too, overturn rate at re-score is tracked, and repeated flips mean the rubric or the reviewer is the problem, not the annotator.</p>
+<h5>Per-annotator lifecycle</h5>
+<div class="tablewrap"><table>
+  <tr><th>Stage</th><th>Sampling</th><th>Floor</th><th>Consequence</th></tr>
+  <tr><td class="key">Ramp</td><td>100% review on first tasks</td><td>None yet</td><td>Exit ramp on consecutive clean tasks</td></tr>
+  <tr><td class="key">Established</td><td>Standard rate</td><td>Personal rolling acceptance floor, set at the pool target minus tolerance, measured on a rolling window</td><td></td></tr>
+  <tr><td class="key">First floor breach</td><td>Elevated</td><td></td><td>Structured feedback within 24 hrs</td></tr>
+  <tr><td class="key">Second breach in window</td><td>Elevated</td><td></td><td>Band downgrade; removal from any evaluator role</td></tr>
+  <tr><td class="key">Sustained breach</td><td></td><td></td><td>Offboard; backfill request raised same day</td></tr>
+  <tr><td class="key">Guideline version bump</td><td>Elevated on first post-bump tasks, all annotators</td><td></td><td>Refresher on the delta before new assignments</td></tr>
+</table></div>
+
+<h3 id="t5-s5" data-nav="5 · Tracking teams across subdomains">5 · Tracking teams across subdomains</h3>
+<p><strong>The platform.</strong> Annotation, review and assignment run on one platform so quality data and allocation data join. Per-annotator record: subdomain cells, band eligibility, ramp status, rolling acceptance rate, throughput, active projects with per-project task counts and review outcomes, and contract start and end dates. The same views roll up per team and per domain.</p>
+<h5>The dashboard, in three tiers: structured by cadence of decision, not by what is measurable</h5>
+<div class="tablewrap"><table>
+  <tr><th style="width:120px">Tier</th><th>Contents</th></tr>
+  <tr><td class="key">Daily, the ops view</td><td>Submissions and acceptances per team, last 24 hrs and trailing 7 days. Queue depth against coverage quotas. Blocked tasks. Active floor-breach flags.</td></tr>
+  <tr><td class="key">Weekly, the management review</td><td>Rolling acceptance per annotator and team. Throughput against plan. Coverage gaps by taxonomy cell. Funnel pipeline state per domain. Projected contract lapses in the next 4 weeks. Evaluator overturn rates. Retention: qualified pool attrition per domain, utilization per annotator against stated capacity, and idle days among qualified annotators, because a qualified expert given no work for two weeks is already on the way out, so every qualified annotator carries a minimum live volume that keeps them ramped and retained.</td></tr>
+  <tr><td class="key">Trigger only, never stared at, always fired</td><td>Contract T-minus-4. Personal floor breach. Evaluator overturn above threshold. A coverage cell starving with no eligible annotator capacity against it. A qualified annotator idle past the minimum-volume threshold, raising an assignment or a check-in to the team lead.</td></tr>
+</table></div>
+<p><strong>Weekly allocation.</strong> Assignment runs weekly as coverage quota gaps x band eligibility x available annotator capacity, adjusted daily when a breach removes capacity or a promotion adds it. Nobody picks tasks, the queue assigns them, which is also what keeps duplication control and coverage tracking honest.</p>
+<h5>Contract triggers: at T minus 4 weeks the platform raises the decision automatically</h5>
+<ol>
+  <li>Rolling acceptance at or above the personal floor and forecast demand in their subdomain cells → extension offer out by T-minus-3.</li>
+  <li>Below floor, or no forecast demand in their cells → planned lapse, and a backfill request enters the funnel the same day, so with time to qualified under a week the replacement is productive well before the contract ends.</li>
+  <li>Named owner is the program manager. Default on no decision by T minus 2 is escalation, a performing annotator is never silently lapsed.</li>
+</ol>
+<p>The 4 week lead is not about funnel speed, it is about forecast stability and notice, a contractor who hears nothing until the final week has already started looking elsewhere. And the projected lapse count is not a reporting widget, it is the demand signal that sizes the recruitment funnel and, for short surges, activates floater freelance capacity instead of new contracts.</p>
+</section>
+
+<footer class="docfoot">
+  Divyansh Sahu · Data Annotation TPM take-home · Prepared for Mistral AI, August 2026.<br>
+  Self-contained document — works offline. Press ⌘K / Ctrl-K or "/" to jump to any section. Print renders with all sections expanded.
+</footer>
+
+</div>
+</main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var pane = document.getElementById('pane');
+  var brief = document.getElementById('brief');
+
+  function paneTop(el) {
+    return el.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop;
+  }
+
+  /* ----- jump from an assignment item to its answer ----- */
+  var qButtons = Array.prototype.slice.call(document.querySelectorAll('[data-target]'));
+  var briefHold = 0; /* while set, the reverse-sync neither rescrolls nor re-highlights the brief */
+
+  function jumpTo(id, flash) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'DETAILS') el.open = true;
+    var fold = el.closest ? el.closest('details.fold') : null;
+    if (fold) fold.open = true;
+    var offset = window.innerWidth <= 960 ? 64 : 18;
+    pane.scrollTo({ top: Math.max(0, paneTop(el) - offset), behavior: 'smooth' });
+    if (flash !== false) {
+      el.classList.remove('flash');
+      void el.offsetWidth; /* restart animation */
+      el.classList.add('flash');
+      setTimeout(function () { el.classList.remove('flash'); }, 1700);
+    }
+  }
+
+  qButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      briefHold = Date.now() + 1800;
+      jumpTo(btn.getAttribute('data-target'));
+      if (window.innerWidth <= 960) brief.classList.remove('open');
+      qButtons.forEach(function (b) { b.classList.remove('active'); });
+      if (btn.classList.contains('b-q')) btn.classList.add('active');
+    });
+  });
+
+  /* ----- reverse sync: highlight the assignment item being answered ----- */
+  var spyPairs = qButtons
+    .filter(function (b) { return b.classList.contains('b-q'); })
+    .map(function (b) { return { btn: b, el: document.getElementById(b.getAttribute('data-target')) }; })
+    .filter(function (p) { return p.el; });
+
+  var spyTicking = false;
+  function onPaneScroll() {
+    if (!spyTicking) {
+      spyTicking = true;
+      requestAnimationFrame(function () {
+        spyTicking = false;
+        /* a click-initiated jump keeps emitting scroll events; keep holding until they stop */
+        if (Date.now() < briefHold) { briefHold = Date.now() + 400; }
+        if (Date.now() > briefHold) {
+          var y = pane.scrollTop + 150;
+          var best = null, bestTop = -Infinity;
+          spyPairs.forEach(function (p) {
+            var t = paneTop(p.el);
+            if (t <= y && t > bestTop) { bestTop = t; best = p; }
+          });
+          spyPairs.forEach(function (p) { p.btn.classList.toggle('active', p === best); });
+          if (best && window.innerWidth > 960) {
+            try { best.btn.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+          }
+        }
+        var max = pane.scrollHeight - pane.clientHeight;
+        document.getElementById('progress').style.width = (max > 0 ? (pane.scrollTop / max) * 100 : 0) + '%';
+      });
+    }
+  }
+  pane.addEventListener('scroll', onPaneScroll, { passive: true });
+  window.addEventListener('resize', onPaneScroll);
+  onPaneScroll();
+
+  /* ----- mobile drawer ----- */
+  var toggle = document.getElementById('railtoggle');
+  toggle.addEventListener('click', function () { brief.classList.toggle('open'); });
+
+  /* ----- expand / collapse ----- */
+  function setFolds(open) {
+    Array.prototype.slice.call(document.querySelectorAll('details.fold')).forEach(function (d) { d.open = open; });
+  }
+  document.getElementById('btn-expand').addEventListener('click', function () { setFolds(true); });
+  document.getElementById('btn-collapse').addEventListener('click', function () { setFolds(false); });
+  window.addEventListener('beforeprint', function () { setFolds(true); });
+
+  /* ----- theme toggle (session only) ----- */
+  var themeState = 'system';
+  var themeBtn = document.getElementById('btn-theme');
+  themeBtn.addEventListener('click', function () {
+    themeState = themeState === 'system' ? 'light' : themeState === 'light' ? 'dark' : 'system';
+    if (themeState === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', themeState);
+    themeBtn.textContent = 'Theme: ' + themeState;
+  });
+
+  /* ----- quick jump palette over every section ----- */
+  var jumpEntries = [];
+  Array.prototype.slice.call(document.querySelectorAll('section.topic')).forEach(function (sec) {
+    var num = sec.getAttribute('data-num');
+    jumpEntries.push({ id: sec.id, label: num + ' — ' + sec.getAttribute('data-title'), ctx: 'Topic' });
+    Array.prototype.slice.call(sec.querySelectorAll('h3[id], h4[id]')).forEach(function (h) {
+      jumpEntries.push({ id: h.id, label: h.getAttribute('data-nav') || h.textContent, ctx: num });
+    });
+  });
+
+  var overlay = null, selIdx = 0, filtered = [];
+  function openJump() {
+    if (overlay) return;
+    overlay = document.createElement('div');
+    overlay.id = 'jump-overlay';
+    overlay.innerHTML =
+      '<div id="jump" role="dialog" aria-label="Quick jump">' +
+      '<input type="text" placeholder="Jump to a section…" aria-label="Search sections">' +
+      '<div id="jump-list"></div>' +
+      '<div class="jump-hint"><span>↑↓ navigate</span><span>↵ jump</span><span>esc close</span></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    var input = overlay.querySelector('input');
+    input.focus();
+    renderJump('');
+    input.addEventListener('input', function () { renderJump(input.value); });
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeJump(); });
+  }
+  function closeJump() { if (overlay) { overlay.remove(); overlay = null; } }
+  function renderJump(q) {
+    var list = overlay.querySelector('#jump-list');
+    q = q.trim().toLowerCase();
+    filtered = jumpEntries.filter(function (e) {
+      return !q || (e.label + ' ' + e.ctx).toLowerCase().indexOf(q) !== -1;
+    });
+    selIdx = 0;
+    list.innerHTML = filtered.map(function (e, i) {
+      return '<div class="jitem' + (i === 0 ? ' sel' : '') + '" data-id="' + e.id + '"><span class="jt">' + e.label + '</span><span class="jc">' + e.ctx + '</span></div>';
+    }).join('') || '<div class="jitem"><span class="jt" style="color:var(--faint)">No match</span></div>';
+    Array.prototype.slice.call(list.querySelectorAll('.jitem[data-id]')).forEach(function (el, i) {
+      el.addEventListener('click', function () { closeJump(); jumpTo(el.getAttribute('data-id')); });
+      el.addEventListener('mousemove', function () { setSel(i); });
+    });
+  }
+  function setSel(i) {
+    selIdx = i;
+    var items = overlay.querySelectorAll('.jitem[data-id]');
+    Array.prototype.slice.call(items).forEach(function (el, j) { el.classList.toggle('sel', j === i); });
+    if (items[i]) items[i].scrollIntoView({ block: 'nearest' });
+  }
+  document.addEventListener('keydown', function (e) {
+    var inField = /input|textarea/i.test((e.target && e.target.tagName) || '');
+    if (!overlay && !inField && (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'))) {
+      e.preventDefault(); openJump(); return;
+    }
+    if (!overlay && !inField && e.key.toLowerCase() === 'e' && !e.metaKey && !e.ctrlKey) { setFolds(true); return; }
+    if (!overlay) return;
+    if (e.key === 'Escape') { closeJump(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); if (selIdx < filtered.length - 1) setSel(selIdx + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (selIdx > 0) setSel(selIdx - 1); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (filtered[selIdx]) { var t = filtered[selIdx].id; closeJump(); jumpTo(t); } }
+    else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); closeJump(); }
+  });
+  document.getElementById('btn-jump').addEventListener('click', openJump);
+})();
+</script>
+</body>
+</html>
